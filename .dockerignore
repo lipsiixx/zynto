@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.gitignore
+.vscode/
+.idea/
+logs/
+media/
+*.log
+.env
+README.md
+план бота.txt
