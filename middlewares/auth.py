@@ -12,6 +12,8 @@ from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject, User as TgUser
 
 from database.queries import users as users_q
+from database.queries import tariffs
+from keyboards.user_kb import tariffs_kb
 
 
 class AuthMiddleware(BaseMiddleware):
@@ -53,6 +55,8 @@ class AuthMiddleware(BaseMiddleware):
         ):
             await users_q.update_subscription_fields(db, user.telegram_id, "expired", user.subscription_expires_at)
             user.subscription_status = "expired"
+            if isinstance(event, Message):
+                await event.answer("Ваша подписка истекла😔Оформите новую и возвращайтесь скорее!", reply_markup=tariffs_kb(tariffs, prefix="buy"))
 
         data["user"] = user
         return await handler(event, data)
