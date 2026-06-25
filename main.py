@@ -7,6 +7,7 @@ from logging.handlers import RotatingFileHandler
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.storage.redis import RedisStorage
@@ -14,7 +15,7 @@ from aiogram.types import BotCommand, ErrorEvent
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from redis.asyncio import Redis
 
-from config import settings
+from config import mask_proxy, settings
 from database.engine import SessionLocal, dispose_db, init_db
 from database.queries import admins as admins_q
 from database.queries import settings as settings_q
@@ -28,7 +29,9 @@ from middlewares.database import DatabaseMiddleware
 from middlewares.throttle import ThrottleMiddleware
 from services import cleaner, media
 from services import notifier as notifier_module
+from services import proxy_monitor as proxy_monitor_module
 from services.notifier import Notifier
+from services.proxy_monitor import ProxyMonitor
 from services.subscription import check_expired_subscriptions
 
 logger = logging.getLogger(__name__)
@@ -56,7 +59,8 @@ def setup_logging() -> None:
     settings.logs_dir.mkdir(parents=True, exist_ok=True)
     level = getattr(logging, settings.log_level.upper(), logging.INFO)
 
-    fmt = logging.Formatter("%(asctime)s | %(levelname)-8s | %(name)s | %(message)s")
+    fmt = logging.Formatter(
+        "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s")
 
     stream = logging.StreamHandler()
     stream.setFormatter(fmt)
@@ -103,7 +107,8 @@ def setup_middlewares(dp: Dispatcher, user_router, admin_router, redis: Redis | 
 def setup_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="UTC")
     scheduler.add_job(cleaner.run_cleanup, "interval", hours=24, id="cleanup")
-    scheduler.add_job(check_expired_subscriptions, "interval", minutes=60, id="check_expired")
+    scheduler.add_job(check_expired_subscriptions, "interval",
+                      minutes=60, id="check_expired")
     return scheduler
 
 
@@ -127,8 +132,33 @@ async def set_commands(bot: Bot) -> None:
         BotCommand(command="start", description="Запуск / главное меню"),
         BotCommand(command="activate", description="Активировать промокод"),
         BotCommand(command="myid", description="Узнать свой Telegram ID"),
-        BotCommand(command="admin", description="Админ-панель"),
     ])
+
+
+async def select_proxy_session() -> tuple[AiohttpSession | None, str]:
+    """Перебирает прокси из настроек и возвращает (сессия, url) первого рабочего.
+
+    Если прокси не заданы или ни один не отвечает — (None, "") (прямое соединение).
+    URL нужен мониторингу прокси, чтобы знать, что именно отслеживать.
+    """
+    proxies = settings.telegram_proxies
+    if not proxies:
+        return None, ""
+    for proxy in proxies:
+        session = AiohttpSession(proxy=proxy)
+        probe = Bot(token=settings.bot_token, session=session)
+        try:
+            me = await asyncio.wait_for(probe.get_me(), timeout=8)
+            logger.info("Прокси рабочий: %s (бот @%s)",
+                        mask_proxy(proxy), me.username)
+            return session, proxy
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Прокси не отвечает, пробую следующий: %s (%s)", mask_proxy(proxy), exc)
+            await session.close()
+    logger.error(
+        "Ни один из %d прокси не сработал — соединяюсь напрямую", len(proxies))
+    return None, ""
 
 
 async def main() -> None:
@@ -145,20 +175,48 @@ async def main() -> None:
     redis: Redis | None = None
     storage = MemoryStorage()
     try:
-        redis = Redis.from_url(settings.redis_url, protocol=2, decode_responses=True)
+        redis = Redis.from_url(
+            settings.redis_url, protocol=2, decode_responses=True)
         await redis.ping()
-        storage = RedisStorage(redis=Redis.from_url(settings.redis_url, protocol=2))
+        storage = RedisStorage(redis=Redis.from_url(
+            settings.redis_url, protocol=2))
         logger.info("Redis подключён: %s", settings.redis_url)
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Redis недоступен (%s). FSM в памяти, throttle отключён.", exc)
+        logger.warning(
+            "Redis недоступен (%s). FSM в памяти, throttle отключён.", exc)
         redis = None
 
-    bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    # Прокси (SOCKS5/HTTP) для обхода блокировки Telegram. Выбираем первый рабочий
+    # из списка (proxies.txt / TELEGRAM_PROXY). Если список пуст — напрямую.
+    bot_session, active_proxy = await select_proxy_session()
+
+    bot = Bot(
+        token=settings.bot_token,
+        session=bot_session,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
     dp = Dispatcher(storage=storage)
 
     # Notifier (очередь уведомлений)
     notifier_module.notifier = Notifier(bot)
     notifier_module.notifier.start()
+
+    # Мониторинг стабильности активного прокси (предупреждения суперадмину).
+    proxy_monitor: ProxyMonitor | None = None
+    if active_proxy:
+        proxy_monitor = ProxyMonitor(bot, active_proxy)
+        proxy_monitor_module.monitor = proxy_monitor
+        proxy_monitor.start()
+    elif settings.telegram_proxies and settings.superadmin_id:
+        # Прокси были заданы, но ни один не ответил — бот ушёл на прямое соединение.
+        try:
+            await bot.send_message(
+                settings.superadmin_id,
+                "🔴 <b>Ни один прокси не ответил при запуске</b>\n"
+                "Бот работает напрямую — в заблокированной сети связь может быть нестабильной.",
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     user_router = get_user_router()
     admin_router = get_admin_router()
@@ -185,6 +243,8 @@ async def main() -> None:
         await dp.start_polling(bot, allowed_updates=ALLOWED_UPDATES)
     finally:
         scheduler.shutdown(wait=False)
+        if proxy_monitor is not None:
+            await proxy_monitor.stop()
         await notifier_module.notifier.stop()
         if redis is not None:
             await redis.aclose()

@@ -9,3 +9,5 @@ media/
 .vscode/
 *.log
 .DS_Store
+media-backup/
+proxies.txt

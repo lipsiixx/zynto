@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import MediaCache
@@ -21,11 +22,19 @@ async def upsert(
     file_type: str | None,
     file_size: int | None,
     local_path: str | None,
-) -> MediaCache:
-    cache = await get_by_unique_id(db, file_unique_id)
+) -> MediaCache | None:
+    """Атомарный upsert (INSERT ... ON CONFLICT) — без гонки при параллельном кешировании.
+
+    Прежняя «проверить-потом-вставить» падала UniqueViolation, когда одно и то же
+    медиа кешировалось двумя апдейтами одновременно. ON CONFLICT снимает гонку на
+    уровне БД. local_path обновляем только если передан непустой."""
     now = datetime.now(timezone.utc)
-    if cache is None:
-        cache = MediaCache(
+    set_ = {"file_id": file_id, "last_used_at": now}
+    if local_path:
+        set_["local_path"] = local_path
+    stmt = (
+        pg_insert(MediaCache)
+        .values(
             file_unique_id=file_unique_id,
             file_id=file_id,
             file_type=file_type,
@@ -33,15 +42,11 @@ async def upsert(
             local_path=local_path,
             last_used_at=now,
         )
-        db.add(cache)
-    else:
-        cache.file_id = file_id
-        if local_path:
-            cache.local_path = local_path
-        cache.last_used_at = now
+        .on_conflict_do_update(index_elements=["file_unique_id"], set_=set_)
+    )
+    await db.execute(stmt)
     await db.commit()
-    await db.refresh(cache)
-    return cache
+    return await get_by_unique_id(db, file_unique_id)
 
 
 async def touch(db: AsyncSession, file_unique_id: str) -> None:

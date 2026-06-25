@@ -41,3 +41,5 @@ async def ensure_defaults(db: AsyncSession) -> None:
         await set_setting(db, "text_retention_days", str(cfg.text_retention_days))
     if await get_setting(db, "media_retention_days") is None:
         await set_setting(db, "media_retention_days", str(cfg.media_retention_days))
+    if await get_setting(db, "log_retention_days") is None:
+        await set_setting(db, "log_retention_days", str(cfg.log_retention_days))

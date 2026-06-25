@@ -56,6 +56,16 @@ def esc(text: str | None) -> str:
     return html.escape(text or "")
 
 
+def user_mention(name: str | None, username: str | None, user_id: int | None) -> str:
+    """Кликабельный тег пользователя: @username, иначе имя-ссылка на профиль."""
+    if username:
+        return f"@{esc(username)}"
+    safe = esc(name) or "Неизвестно"
+    if user_id:
+        return f'<a href="tg://user?id={user_id}">{safe}</a>'
+    return safe
+
+
 def subscription_status_text(status: str, expires_at: datetime | None) -> str:
     if status == "lifetime":
         return "♾ Навсегда"

@@ -1,0 +1,13 @@
+# Прокси для обхода блокировки Telegram.
+# Скопируй в proxies.txt и впиши свои прокси: cp proxies.txt.example proxies.txt
+#
+# Бот использует ПЕРВУЮ валидную строку (не комментарий).
+# Приоритет: переменная окружения TELEGRAM_PROXY важнее этого файла.
+#
+# Форматы (любой из них):
+#   host:port:user:pass                      <- как дают провайдеры (SOCKS5)
+#   host:port                                <- SOCKS5 без авторизации
+#   socks5://user:pass@host:port             <- готовый URL
+#   http://user:pass@host:port               <- HTTP-прокси
+
+# host:port:user:pass

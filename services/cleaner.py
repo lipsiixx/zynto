@@ -15,6 +15,37 @@ from config import settings as cfg
 logger = logging.getLogger(__name__)
 
 
+def cleanup_logs(now: datetime, log_days: int) -> tuple[int, int]:
+    """Удаляет ротированные лог-файлы старше log_days.
+
+    Активный `bot.log` не трогаем (его держит RotatingFileHandler) — чистим
+    только бэкапы вида `bot.log.1`, `bot.log.2` … по времени модификации.
+    Возвращает (сколько_удалено, освобождено_байт).
+    """
+    if log_days <= 0:
+        return 0, 0
+    logs_dir = cfg.logs_dir
+    if not logs_dir.exists():
+        return 0, 0
+
+    cutoff_ts = (now - timedelta(days=log_days)).timestamp()
+    removed = 0
+    freed = 0
+    for path in logs_dir.glob("bot.log.*"):
+        if not path.is_file():
+            continue
+        try:
+            if path.stat().st_mtime >= cutoff_ts:
+                continue
+            size = path.stat().st_size
+            path.unlink()
+            removed += 1
+            freed += size
+        except OSError as exc:
+            logger.warning("Не удалось удалить лог %s: %s", path, exc)
+    return removed, freed
+
+
 async def run_cleanup() -> dict:
     now = datetime.now(timezone.utc)
     removed_files = 0
@@ -24,6 +55,7 @@ async def run_cleanup() -> dict:
     async with SessionLocal() as db:
         text_days = await settings_q.get_int_setting(db, "text_retention_days", cfg.text_retention_days)
         media_days = await settings_q.get_int_setting(db, "media_retention_days", cfg.media_retention_days)
+        log_days = await settings_q.get_int_setting(db, "log_retention_days", cfg.log_retention_days)
 
         # 1. Очистка медиафайлов
         if media_days > 0:
@@ -73,13 +105,18 @@ async def run_cleanup() -> dict:
             )
             await db.commit()
 
+    # 3. Очистка старых лог-файлов (вне сессии БД — это работа с ФС)
+    removed_logs, freed_log_bytes = cleanup_logs(now, log_days)
+    freed_bytes += freed_log_bytes
+
     result = {
         "removed_files": removed_files,
         "freed_mb": freed_bytes / 1024**2,
         "removed_rows": removed_rows,
+        "removed_logs": removed_logs,
     }
     logger.info(
-        "Очистка завершена: файлов=%s, освобождено=%.2fМБ, записей=%s",
-        removed_files, result["freed_mb"], removed_rows,
+        "Очистка завершена: файлов=%s, логов=%s, освобождено=%.2fМБ, записей=%s",
+        removed_files, removed_logs, result["freed_mb"], removed_rows,
     )
     return result

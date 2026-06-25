@@ -20,7 +20,7 @@ from database.engine import SessionLocal
 from database.models import MessageLog
 from database.queries import users as users_q
 from services import media as media_service
-from utils.formatters import esc, fmt_dt, truncate, type_label
+from utils.formatters import esc, fmt_dt, truncate, type_label, user_mention
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,7 @@ class Notifier:
         # Пер-пользовательские локи: сериализуют отправку одному адресату и
         # гарантируют паузу между его уведомлениями, не мешая другим.
         self._locks: dict[int, asyncio.Lock] = {}
+        self._bot_username: str | None = None
 
     def start(self) -> None:
         if self._running:
@@ -148,57 +149,82 @@ class Notifier:
             # Пауза держит лимит на один чат, но НЕ блокирует других адресатов.
             await asyncio.sleep(PER_CHAT_DELAY)
 
+    async def _footer(self) -> str:
+        """Подпись бота снизу сообщения (фиолетовый акцент + кликабельный тег)."""
+        if self._bot_username is None:
+            try:
+                me = await self.bot.me()
+                self._bot_username = me.username or ""
+            except Exception:  # noqa: BLE001
+                self._bot_username = ""
+        tag = (
+            f'<a href="https://t.me/{self._bot_username}">@{self._bot_username}</a>'
+            if self._bot_username else "Zynto"
+        )
+        return f"🟪➖➖➖➖➖➖➖➖➖🟪\n💜 <i>Перехвачено ботом</i> {tag}"
+
+    @staticmethod
+    def _sender_tag(record: MessageLog) -> str:
+        return user_mention(record.sender_name, record.sender_username, record.sender_id)
+
+    @staticmethod
+    def _quote(text: str | None) -> str:
+        body = esc(truncate(text))
+        return f"<blockquote>{body}</blockquote>" if body else "<i>— пусто —</i>"
+
     async def _process(self, job: dict) -> None:
         kind = job["kind"]
         target = job["target"]
         record: MessageLog = job["record"]
-        sender = esc(record.sender_name or "—")
+        tag = self._sender_tag(record)
+        footer = await self._footer()
 
         if kind == "deleted":
-            await self._send_deleted(target, record, sender)
+            await self._send_deleted(target, record, tag, footer)
         elif kind == "edited":
-            await self._send_edited(target, record, sender)
+            await self._send_edited(target, record, tag, footer)
 
-    async def _send_deleted(self, target: int, record: MessageLog, sender: str) -> None:
+    async def _send_deleted(self, target: int, record: MessageLog, tag: str, footer: str) -> None:
         when_del = fmt_dt(record.deleted_at)
         when_sent = fmt_dt(record.received_at)
         if record.file_id:
             caption = (
-                f"🗑 <b>Удалено</b> • 👤 {sender} • 🕐 {when_del}\n"
-                f"({type_label(record.message_type)})"
+                f"🟣 <b>Удалено сообщение</b> 🔮\n\n"
+                f"👤 <b>Кто:</b> {tag}\n"
+                f"🟪 <b>Тип:</b> {type_label(record.message_type)}\n"
+                f"🗑 <b>Удалено:</b> {when_del}\n"
             )
             if record.text_content:
-                caption += f"\n💬 {esc(truncate(record.text_content))}"
+                caption += f"\n💬 {self._quote(record.text_content)}\n"
+            caption += f"\n{footer}"
             await media_service.send_media(self.bot, target, record, caption)
         else:
             text = (
-                f"🗑 <b>Сообщение удалено</b>\n\n"
-                f"👤 От: {sender}\n"
-                f"💬 {esc(truncate(record.text_content)) or '—'}\n"
-                f"🕐 {when_del} (отправлено {when_sent})"
+                f"🟣 <b>Удалено сообщение</b> 🔮\n\n"
+                f"👤 <b>Кто:</b> {tag}\n"
+                f"🗑 <b>Удалено:</b> {when_del}\n"
+                f"📨 <b>Отправлено:</b> {when_sent}\n\n"
+                f"💬 {self._quote(record.text_content)}\n\n"
+                f"{footer}"
             )
             await self.bot.send_message(target, text)
 
-    async def _send_edited(self, target: int, record: MessageLog, sender: str) -> None:
+    async def _send_edited(self, target: int, record: MessageLog, tag: str, footer: str) -> None:
         when = fmt_dt(record.edited_at)
-        was = esc(truncate(record.original_text)) or "—"
-        now = esc(truncate(record.text_content)) or "—"
-        if record.file_id:
-            text = (
-                f"✏️ <b>Подпись к медиафайлу изменена</b>\n\n"
-                f"👤 От: {sender}\n"
-                f"❌ Было: {was}\n"
-                f"✅ Стало: {now}\n"
-                f"🕐 {when}"
-            )
-        else:
-            text = (
-                f"✏️ <b>Сообщение изменено</b>\n\n"
-                f"👤 От: {sender}\n"
-                f"❌ Было: {was}\n"
-                f"✅ Стало: {now}\n"
-                f"🕐 {when}"
-            )
+        was = self._quote(record.original_text)
+        now = self._quote(record.text_content)
+        title = (
+            "✏️ <b>Изменена подпись к медиа</b> 🔮"
+            if record.file_id else "✏️ <b>Изменено сообщение</b> 🔮"
+        )
+        text = (
+            f"🟣 {title}\n\n"
+            f"👤 <b>Кто:</b> {tag}\n"
+            f"🕐 <b>Изменено:</b> {when}\n\n"
+            f"❌ <b>Было:</b>\n{was}\n"
+            f"✅ <b>Стало:</b>\n{now}\n\n"
+            f"{footer}"
+        )
         await self.bot.send_message(target, text)
 
 

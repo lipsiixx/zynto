@@ -31,6 +31,9 @@ async def on_deleted_business_messages(
         record = await messages_q.find_message(db, owner.telegram_id, chat_id, message_id)
         if record is None:
             continue  # сообщение пришло до подключения бота
+        # Собственное (исходящее) сообщение владельца — не уведомляем его о своём же удалении.
+        if record.is_outgoing:
+            continue
         await messages_q.mark_deleted(db, record)
         logger.info("Удалено: user=%s chat=%s msg=%s", owner.telegram_id, chat_id, message_id)
         await notifier.notify_deleted(owner.telegram_id, record)

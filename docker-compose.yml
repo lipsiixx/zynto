@@ -31,6 +31,8 @@ services:
     volumes:
       - ./media:/app/media
       - ./logs:/app/logs
+      # proxies.txt не в образе (секреты) — монтируем с хоста, если есть
+      - ./proxies.txt:/app/proxies.txt:ro
     depends_on:
       db:
         condition: service_healthy

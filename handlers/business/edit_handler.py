@@ -26,6 +26,11 @@ async def on_edited_business_message(message: Message, db: AsyncSession, bot: Bo
     if owner is None:
         return
 
+    # Собственное (исходящее) сообщение владельца — не уведомляем его о своей же правке.
+    author = message.from_user
+    if author and author.id == owner.telegram_id:
+        return
+
     data = extract(message)
     record = await messages_q.find_message(db, owner.telegram_id, message.chat.id, message.message_id)
 

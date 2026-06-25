@@ -13,6 +13,7 @@ def admin_main(is_superadmin: bool) -> InlineKeyboardMarkup:
     kb.button(text="🎟 Промокоды", callback_data="a:promo")
     kb.button(text="📊 Статистика", callback_data="a:stats")
     kb.button(text="🖥 Сервер", callback_data="a:server")
+    kb.button(text="🌐 Прокси", callback_data="a:proxy")
     kb.button(text="👤 Пользователи", callback_data="a:users")
     if is_superadmin:
         kb.button(text="👮 Управление админами", callback_data="a:admins")
@@ -24,6 +25,14 @@ def admin_main(is_superadmin: bool) -> InlineKeyboardMarkup:
 def admin_back() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="⬅️ В админку", callback_data="a:main")
+    return kb.as_markup()
+
+
+def proxy_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🔄 Проверить заново", callback_data="a:proxy_check")
+    kb.button(text="⬅️ В админку", callback_data="a:main")
+    kb.adjust(1)
     return kb.as_markup()
 
 
