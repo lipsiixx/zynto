@@ -17,12 +17,14 @@ def main_menu(subscribed: bool = True, connected: bool = False) -> InlineKeyboar
     elif not connected:
         kb.button(text="📡 Подключить мониторинг", callback_data="connect")
         kb.button(text="💳 Подписка", callback_data="subscription")
+        kb.button(text="👥 Пригласить друга", callback_data="referral")
         kb.button(text="🎁 Подарить подписку", callback_data="gift")
         kb.button(text="❓ Как подключить", callback_data="how")
     else:
         kb.button(text="📋 История сообщений", callback_data="history")
         kb.button(text="📡 Мониторинг", callback_data="connect")
         kb.button(text="💳 Подписка", callback_data="subscription")
+        kb.button(text="👥 Пригласить друга", callback_data="referral")
         kb.button(text="🎁 Подарить подписку", callback_data="gift")
     kb.adjust(1)
     return kb.as_markup()
@@ -34,6 +36,7 @@ def main_menu_sub() -> InlineKeyboardMarkup:
     kb.button(text="📡 Подключить мониторинг", callback_data="connect")
     kb.button(text="📋 История сообщений", callback_data="history")
     kb.button(text="💳 Подписка", callback_data="subscription")
+    kb.button(text="👥 Пригласить друга", callback_data="referral")
     kb.button(text="🎁 Подарить подписку", callback_data="gift")
     kb.adjust(1)
     return kb.as_markup()

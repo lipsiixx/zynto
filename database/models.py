@@ -40,6 +40,8 @@ class User(Base):
     ban_reason: Mapped[str | None] = mapped_column(Text)
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)  # заблокировал бота
     pending_promo_id: Mapped[int | None] = mapped_column(BigInteger)  # ожидающий скидочный промокод
+    referred_by: Mapped[int | None] = mapped_column(BigInteger)       # telegram_id пригласившего
+    referral_rewarded: Mapped[bool] = mapped_column(Boolean, server_default="false", default=False)
     created_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
     last_active_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
 

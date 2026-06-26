@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import User
 from database.queries import business as business_q
+from database.queries import users as users_q
 from keyboards.user_kb import main_menu, main_menu_sub, back_to_menu
 from services import subscription as sub_service
 from utils.formatters import days_left, esc, subscription_status_text
@@ -74,6 +75,18 @@ async def _home_text(user: User, db: AsyncSession) -> tuple[str, object]:
 @router.message(CommandStart())
 async def cmd_start(message: Message, user: User, db: AsyncSession, state: FSMContext) -> None:
     await state.clear()
+    # Обработка реферальной ссылки: /start ref123456789
+    parts = message.text.split(maxsplit=1)
+    if len(parts) > 1:
+        payload = parts[1]
+        if payload.startswith("ref"):
+            try:
+                referrer_id = int(payload[3:])
+                if referrer_id != user.telegram_id and user.referred_by is None:
+                    await users_q.set_referred_by(db, user.telegram_id, referrer_id)
+                    await db.refresh(user)
+            except ValueError:
+                pass
     text, markup = await _home_text(user, db)
     await message.answer(text, reply_markup=markup)
 

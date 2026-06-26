@@ -1,7 +1,7 @@
 """Сборка пользовательского роутера."""
 from aiogram import Router
 
-from . import activate_code, gift, history, media_gallery, start, subscription
+from . import activate_code, gift, history, media_gallery, referral, start, subscription
 
 
 def get_user_router() -> Router:
@@ -12,4 +12,5 @@ def get_user_router() -> Router:
     router.include_router(history.router)
     router.include_router(media_gallery.router)
     router.include_router(gift.router)
+    router.include_router(referral.router)
     return router

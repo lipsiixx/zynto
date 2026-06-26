@@ -57,3 +57,7 @@ class FindUserStates(StatesGroup):
 class BroadcastStates(StatesGroup):
     waiting_content = State()
     confirm = State()
+
+
+class ReferralSettingsStates(StatesGroup):
+    waiting_bonus_days = State()

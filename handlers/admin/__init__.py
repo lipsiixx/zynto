@@ -8,6 +8,7 @@ from . import (
     panel,
     promo,
     proxy,
+    referral,
     server,
     stats,
     tariffs,
@@ -27,4 +28,5 @@ def get_admin_router() -> Router:
     router.include_router(users_mgmt.router)
     router.include_router(admins_mgmt.router)
     router.include_router(cleanup.router)
+    router.include_router(referral.router)
     return router

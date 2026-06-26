@@ -13,8 +13,10 @@ from aiogram.types import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import User
+from aiogram import Bot
 from database.queries import business as business_q
 from database.queries import promo_codes as promo_q
+from database.queries import settings as settings_q
 from database.queries import tariffs as tariffs_q
 from database.queries import users as users_q
 from keyboards.user_kb import (
@@ -153,8 +155,31 @@ async def pre_checkout(query: PreCheckoutQuery) -> None:
     await query.answer(ok=True)
 
 
+async def _reward_referrer(db: AsyncSession, bot: Bot, user: User) -> None:
+    if not user.referred_by or user.referral_rewarded:
+        return
+    bonus_days = await settings_q.get_int_setting(db, "referral_bonus_days", 1)
+    if bonus_days <= 0:
+        return
+    referrer = await users_q.get_user(db, user.referred_by)
+    if referrer is None:
+        return
+    await sub_service.activate_subscription(
+        db, referrer, duration_days=bonus_days, payment_method="referral"
+    )
+    await users_q.set_referral_rewarded(db, user.telegram_id)
+    label = "день" if bonus_days == 1 else f"{bonus_days} дн."
+    try:
+        await bot.send_message(
+            referrer.telegram_id,
+            f"🎉 <b>Твой друг оформил подписку!</b>\n\nТебе начислен бонус: +{label} бесплатного доступа.",
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+
 @router.message(F.successful_payment)
-async def on_successful_payment(message: Message, user: User, db: AsyncSession) -> None:
+async def on_successful_payment(message: Message, user: User, db: AsyncSession, bot: Bot) -> None:
     sp = message.successful_payment
     payload = sp.invoice_payload or ""
 
@@ -197,6 +222,7 @@ async def on_successful_payment(message: Message, user: User, db: AsyncSession) 
         tariff_id=tariff.id,
         telegram_payment_charge_id=sp.telegram_payment_charge_id,
     )
+    await _reward_referrer(db, bot, user)
     await message.answer(
         "✅ <b>Подписка активирована!</b> Приятного использования.",
         reply_markup=main_menu_sub(),

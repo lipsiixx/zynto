@@ -99,6 +99,39 @@ async def count_by_status(db: AsyncSession, status: str) -> int:
     return int(res.scalar() or 0)
 
 
+async def set_referred_by(db: AsyncSession, telegram_id: int, referrer_id: int) -> None:
+    await db.execute(
+        update(User).where(User.telegram_id == telegram_id, User.referred_by.is_(None))
+        .values(referred_by=referrer_id)
+    )
+    await db.commit()
+
+
+async def set_referral_rewarded(db: AsyncSession, telegram_id: int) -> None:
+    await db.execute(update(User).where(User.telegram_id == telegram_id).values(referral_rewarded=True))
+    await db.commit()
+
+
+async def get_referral_stats_for_user(db: AsyncSession, referrer_id: int) -> dict:
+    total = int((await db.execute(
+        select(func.count(User.id)).where(User.referred_by == referrer_id)
+    )).scalar() or 0)
+    rewarded = int((await db.execute(
+        select(func.count(User.id)).where(User.referred_by == referrer_id, User.referral_rewarded == True)  # noqa: E712
+    )).scalar() or 0)
+    return {"total": total, "rewarded": rewarded}
+
+
+async def get_referral_stats(db: AsyncSession) -> dict:
+    total = int((await db.execute(
+        select(func.count(User.id)).where(User.referred_by.is_not(None))
+    )).scalar() or 0)
+    rewarded = int((await db.execute(
+        select(func.count(User.id)).where(User.referral_rewarded == True)  # noqa: E712
+    )).scalar() or 0)
+    return {"total": total, "rewarded": rewarded}
+
+
 async def get_broadcast_recipients(db: AsyncSession) -> list[int]:
     """Все telegram_id пользователей, которым можно отправить рассылку."""
     res = await db.execute(
