@@ -99,6 +99,11 @@ async def count_by_status(db: AsyncSession, status: str) -> int:
     return int(res.scalar() or 0)
 
 
+async def set_pending_promo(db: AsyncSession, telegram_id: int, promo_id: int | None) -> None:
+    await db.execute(update(User).where(User.telegram_id == telegram_id).values(pending_promo_id=promo_id))
+    await db.commit()
+
+
 async def count_active_subscribers(db: AsyncSession) -> int:
     res = await db.execute(
         select(func.count(User.id)).where(User.subscription_status.in_(["active", "lifetime"]))

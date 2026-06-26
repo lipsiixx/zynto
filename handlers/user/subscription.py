@@ -14,7 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import User
 from database.queries import business as business_q
+from database.queries import promo_codes as promo_q
 from database.queries import tariffs as tariffs_q
+from database.queries import users as users_q
 from keyboards.user_kb import (
     back_to_menu,
     main_menu,
@@ -100,20 +102,32 @@ async def cb_connect(call: CallbackQuery, user: User, db: AsyncSession) -> None:
 
 
 @router.callback_query(F.data.startswith("buy:"))
-async def cb_buy(call: CallbackQuery, db: AsyncSession) -> None:
+async def cb_buy(call: CallbackQuery, user: User, db: AsyncSession) -> None:
     tariff_id = int(call.data.split(":", 1)[1])
     tariff = await tariffs_q.get_tariff(db, tariff_id)
     if tariff is None or not tariff.is_active:
         await call.answer("Тариф недоступен", show_alert=True)
         return
 
+    price = tariff.price_stars
+    discount_note = ""
+
+    if user.pending_promo_id is not None:
+        promo = await promo_q.get_by_id(db, user.pending_promo_id)
+        if promo and promo.code_type == "discount" and promo_q.is_available(promo):
+            applies = promo.discount_tariff_id is None or promo.discount_tariff_id == tariff.id
+            if applies:
+                discount = min(promo.discount_stars or 0, price - 1)  # цена минимум 1 XTR
+                price = price - discount
+                discount_note = f" (скидка {discount}⭐)"
+
     await call.message.answer_invoice(
         title=tariff.name,
-        description=tariff.description or f"Подписка на мониторинг: {tariff.name}",
+        description=(tariff.description or f"Подписка на мониторинг: {tariff.name}") + discount_note,
         payload=f"tariff_{tariff.id}_{call.from_user.id}",
-        provider_token="",  # пусто для Stars
+        provider_token="",
         currency="XTR",
-        prices=[LabeledPrice(label=tariff.name, amount=tariff.price_stars)],
+        prices=[LabeledPrice(label=tariff.name + discount_note, amount=price)],
     )
     await call.answer()
 
@@ -149,6 +163,15 @@ async def on_successful_payment(message: Message, user: User, db: AsyncSession) 
     if tariff is None:
         await message.answer("⚠️ Тариф не найден, обратись в поддержку.")
         return
+
+    # Записываем использование скидочного промокода если был применён
+    if user.pending_promo_id is not None:
+        promo = await promo_q.get_by_id(db, user.pending_promo_id)
+        if promo and promo.code_type == "discount":
+            applies = promo.discount_tariff_id is None or promo.discount_tariff_id == tariff.id
+            if applies and promo_q.is_available(promo):
+                await promo_q.record_use(db, promo, user.telegram_id)
+        await users_q.set_pending_promo(db, user.telegram_id, None)
 
     await sub_service.activate_subscription(
         db,

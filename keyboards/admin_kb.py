@@ -82,6 +82,34 @@ def confirm_kb(yes_cb: str, no_cb: str = "a:main") -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def promo_type_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🔑 Код доступа", callback_data="a:promotype:access")
+    kb.button(text="🎫 Скидочный код", callback_data="a:promotype:discount")
+    kb.button(text="⬅️ В промокоды", callback_data="a:promo")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def promo_max_uses_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="1️⃣ Одноразовый", callback_data="a:promouses:1")
+    kb.button(text="♾ Без лимита", callback_data="a:promouses:0")
+    kb.button(text="⬅️ В промокоды", callback_data="a:promo")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def promo_discount_tariff_kb(tariffs: list[Tariff]) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🌐 Любой тариф", callback_data="a:promodtariff:any")
+    for t in tariffs:
+        kb.button(text=f"{t.name} — {t.price_stars}⭐", callback_data=f"a:promodtariff:{t.id}")
+    kb.button(text="⬅️ В промокоды", callback_data="a:promo")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 def promo_menu_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="➕ Создать промокод", callback_data="a:promo_new")

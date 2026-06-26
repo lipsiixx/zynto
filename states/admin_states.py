@@ -17,8 +17,15 @@ class EditTariffStates(StatesGroup):
 
 
 class CreatePromoStates(StatesGroup):
+    waiting_type = State()
+    # access-код
     waiting_duration = State()
     waiting_custom_days = State()
+    # скидочный код
+    waiting_discount_tariff = State()
+    waiting_discount_amount = State()
+    # общее
+    waiting_max_uses = State()
     waiting_code_expiry = State()
     waiting_note = State()
 

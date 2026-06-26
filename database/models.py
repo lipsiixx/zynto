@@ -39,6 +39,7 @@ class User(Base):
     is_banned: Mapped[bool] = mapped_column(Boolean, default=False)
     ban_reason: Mapped[str | None] = mapped_column(Text)
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)  # заблокировал бота
+    pending_promo_id: Mapped[int | None] = mapped_column(BigInteger)  # ожидающий скидочный промокод
     created_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
     last_active_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
 
@@ -92,9 +93,17 @@ class PromoCode(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(32), unique=True, nullable=False, index=True)
     created_by: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    duration_days: Mapped[int | None] = mapped_column(Integer)  # NULL = lifetime
+    code_type: Mapped[str] = mapped_column(String(20), server_default="access")  # access | discount
+    # access-code fields
+    duration_days: Mapped[int | None] = mapped_column(Integer)  # минуты (NULL = lifetime)
     duration_label: Mapped[str | None] = mapped_column(String(50))
-    used_by: Mapped[int | None] = mapped_column(BigInteger)
+    # discount-code fields
+    discount_stars: Mapped[int | None] = mapped_column(Integer)
+    discount_tariff_id: Mapped[int | None] = mapped_column(BigInteger)  # NULL = любой тариф
+    # usage tracking
+    max_uses: Mapped[int | None] = mapped_column(Integer, server_default="1")  # NULL = без лимита
+    uses_count: Mapped[int] = mapped_column(Integer, server_default="0", default=0)
+    used_by: Mapped[int | None] = mapped_column(BigInteger)   # для обратной совместимости
     used_at: Mapped[datetime | None] = mapped_column(_ts())
     code_expires_at: Mapped[datetime | None] = mapped_column(_ts())
     access_expires_at: Mapped[datetime | None] = mapped_column(_ts())
