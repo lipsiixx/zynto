@@ -14,7 +14,7 @@ from database.models import User
 from database.queries import promo_codes as promo_q
 from database.queries import tariffs as tariffs_q
 from database.queries import users as users_q
-from keyboards.user_kb import main_menu, subscribe_button, tariffs_kb
+from keyboards.user_kb import main_menu_sub, subscribe_button, tariffs_kb
 from services import subscription as sub_service
 from states.user_states import ActivateCodeStates
 from utils.formatters import fmt_dt
@@ -53,7 +53,7 @@ async def _activate_access(message: Message, user: User, db: AsyncSession, promo
     logger.info("Промокод доступа активирован: code=%s user=%s", promo.code, user.telegram_id)
     await message.answer(
         f"✅ <b>Код активирован!</b> Доступ открыт {period}.",
-        reply_markup=main_menu(),
+        reply_markup=main_menu_sub(),
     )
 
 

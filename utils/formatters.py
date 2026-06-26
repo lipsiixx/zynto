@@ -76,6 +76,25 @@ def subscription_status_text(status: str, expires_at: datetime | None) -> str:
     return "❌ нет"
 
 
+def days_left(dt: datetime | None) -> str:
+    """Возвращает строку вида «осталось 3 дня» / «истекает сегодня»."""
+    if dt is None:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    delta = dt - datetime.now(timezone.utc)
+    days = delta.days
+    if days < 0:
+        return "истекла"
+    if days == 0:
+        return "истекает сегодня"
+    if days == 1:
+        return "остался 1 день"
+    if 2 <= days <= 4:
+        return f"осталось {days} дня"
+    return f"осталось {days} дней"
+
+
 def duration_text(duration_days: int | None) -> str:
     if duration_days is None:
         return "Навсегда"

@@ -5,23 +5,15 @@ from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from keyboards.user_kb import back_to_menu, main_menu
+from database.models import User
+from database.queries import business as business_q
+from keyboards.user_kb import main_menu, main_menu_sub, back_to_menu
+from services import subscription as sub_service
+from utils.formatters import days_left, esc, subscription_status_text
 
 router = Router(name="user-start")
-
-WELCOME = (
-    "✨ <b>Добро пожаловать!</b>\n\n"
-    "👁 <b>Я — бот-хранитель твоей переписки</b>\n"
-    "Я слежу за удалёнными и изменёнными сообщениями в твоих чатах.\n\n"
-    "🛡 <b>Как я работаю:</b>\n"
-    "• Если кто-то удалит сообщение — я покажу тебе оригинал\n"
-    "• Если кто-то изменит сообщение — я покажу, что было до правки\n\n"
-    "❓ Вопросы или предложения?\n"
-    "Обращайся к админам:\n"
-    "👨‍💻 <a href='https://t.me/MARKBANDANA'>@MARKBANDANA</a>\n"
-    "👨‍💻 <a href='https://t.me/whatever891'>@whatever891</a>"
-)
 
 HOW_IT_WORKS = (
     "📡 <b>Как подключить бота (3 простых шага):</b>\n\n"
@@ -38,10 +30,52 @@ HOW_IT_WORKS = (
 )
 
 
+async def _home_text(user: User, db: AsyncSession) -> tuple[str, object]:
+    """Возвращает (текст, клавиатура) в зависимости от статуса пользователя."""
+    first_name = (user.full_name or "").split()[0] if user.full_name else "друг"
+
+    has_sub = sub_service.has_active_subscription(user)
+
+    if not has_sub:
+        text = (
+            f"👋 Привет, <b>{esc(first_name)}</b>!\n\n"
+            "Я слежу за удалёнными и изменёнными сообщениями "
+            "в твоих бизнес-чатах и сразу показываю тебе оригинал.\n\n"
+            "🔴 <b>Подписка:</b> не оформлена\n\n"
+            "Оформи подписку, чтобы начать 👇"
+        )
+        return text, main_menu(subscribed=False)
+
+    # Строка статуса подписки
+    if user.subscription_status == "lifetime":
+        sub_line = "♾ <b>Подписка:</b> навсегда"
+    else:
+        left = days_left(user.subscription_expires_at)
+        sub_line = f"✅ <b>Подписка:</b> активна ({left})"
+
+    # Статус мониторинга
+    conn = await business_q.get_active_for_user(db, user.telegram_id)
+    if conn:
+        conn_line = "🟢 <b>Мониторинг:</b> активен"
+        markup = main_menu(subscribed=True, connected=True)
+    else:
+        conn_line = "⚪ <b>Мониторинг:</b> не подключён → нажми «Подключить»"
+        markup = main_menu(subscribed=True, connected=False)
+
+    text = (
+        f"👋 Привет, <b>{esc(first_name)}</b>!\n\n"
+        f"{sub_line}\n"
+        f"{conn_line}\n\n"
+        "Выбери раздел 👇"
+    )
+    return text, markup
+
+
 @router.message(CommandStart())
-async def cmd_start(message: Message, state: FSMContext) -> None:
+async def cmd_start(message: Message, user: User, db: AsyncSession, state: FSMContext) -> None:
     await state.clear()
-    await message.answer(WELCOME, reply_markup=main_menu())
+    text, markup = await _home_text(user, db)
+    await message.answer(text, reply_markup=markup)
 
 
 @router.message(Command("myid"))
@@ -50,15 +84,17 @@ async def cmd_myid(message: Message) -> None:
 
 
 @router.message(Command("menu"))
-async def cmd_menu(message: Message, state: FSMContext) -> None:
+async def cmd_menu(message: Message, user: User, db: AsyncSession, state: FSMContext) -> None:
     await state.clear()
-    await message.answer(WELCOME, reply_markup=main_menu())
+    text, markup = await _home_text(user, db)
+    await message.answer(text, reply_markup=markup)
 
 
 @router.callback_query(F.data == "menu")
-async def cb_menu(call: CallbackQuery, state: FSMContext) -> None:
+async def cb_menu(call: CallbackQuery, user: User, db: AsyncSession, state: FSMContext) -> None:
     await state.clear()
-    await call.message.edit_text(WELCOME, reply_markup=main_menu())
+    text, markup = await _home_text(user, db)
+    await call.message.edit_text(text, reply_markup=markup)
     await call.answer()
 
 

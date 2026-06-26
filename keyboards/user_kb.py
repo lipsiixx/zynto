@@ -8,13 +8,33 @@ from database.models import Tariff
 from utils.formatters import duration_text
 
 
-def main_menu() -> InlineKeyboardMarkup:
+def main_menu(subscribed: bool = True, connected: bool = False) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    if not subscribed:
+        kb.button(text="💳 Оформить подписку", callback_data="subscription")
+        kb.button(text="🎟 Активировать промокод", callback_data="activate")
+        kb.button(text="❓ Как это работает", callback_data="how")
+    elif not connected:
+        kb.button(text="📡 Подключить мониторинг", callback_data="connect")
+        kb.button(text="💳 Подписка", callback_data="subscription")
+        kb.button(text="🎁 Подарить подписку", callback_data="gift")
+        kb.button(text="❓ Как подключить", callback_data="how")
+    else:
+        kb.button(text="📋 История сообщений", callback_data="history")
+        kb.button(text="📡 Мониторинг", callback_data="connect")
+        kb.button(text="💳 Подписка", callback_data="subscription")
+        kb.button(text="🎁 Подарить подписку", callback_data="gift")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def main_menu_sub() -> InlineKeyboardMarkup:
+    """Меню после успешной оплаты/активации — без статусного запроса к БД."""
     kb = InlineKeyboardBuilder()
     kb.button(text="📡 Подключить мониторинг", callback_data="connect")
-    kb.button(text="💳 Подписка", callback_data="subscription")
     kb.button(text="📋 История сообщений", callback_data="history")
+    kb.button(text="💳 Подписка", callback_data="subscription")
     kb.button(text="🎁 Подарить подписку", callback_data="gift")
-    kb.button(text="❓ Как это работает", callback_data="how")
     kb.adjust(1)
     return kb.as_markup()
 

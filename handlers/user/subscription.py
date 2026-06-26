@@ -19,13 +19,13 @@ from database.queries import tariffs as tariffs_q
 from database.queries import users as users_q
 from keyboards.user_kb import (
     back_to_menu,
-    main_menu,
+    main_menu_sub,
     renew_kb,
     subscribe_button,
     tariffs_kb,
 )
 from services import subscription as sub_service
-from utils.formatters import subscription_status_text
+from utils.formatters import days_left, subscription_status_text
 
 logger = logging.getLogger(__name__)
 router = Router(name="user-subscription")
@@ -47,10 +47,12 @@ HOW_CONNECT = (
 
 async def _show_subscription(target: Message, user: User, db: AsyncSession, edit: bool) -> None:
     if sub_service.has_active_subscription(user):
-        text = (
-            "💳 <b>Твоя подписка</b>\n\n"
-            f"Статус: {subscription_status_text(user.subscription_status, user.subscription_expires_at)}"
-        )
+        if user.subscription_status == "lifetime":
+            status_line = "♾ <b>Навсегда</b>"
+        else:
+            left = days_left(user.subscription_expires_at)
+            status_line = f"✅ Активна · {left}"
+        text = f"💳 <b>Твоя подписка</b>\n\n{status_line}"
         markup = renew_kb()
     else:
         tariffs = await tariffs_q.list_tariffs(db, only_active=True)
@@ -58,7 +60,21 @@ async def _show_subscription(target: Message, user: User, db: AsyncSession, edit
             text = "💳 Сейчас нет доступных тарифов. Загляни позже."
             markup = back_to_menu()
         else:
-            text = "💳 <b>Выбери тариф:</b>"
+            # Показываем описания тарифов в тексте
+            lines = ["💳 <b>Выбери тариф:</b>\n"]
+            for t in tariffs:
+                desc = t.description or ""
+                lines.append(f"<b>{t.name}</b> — {t.price_stars}⭐\n{desc}")
+            # Индикатор скидки
+            if user.pending_promo_id:
+                promo = await promo_q.get_by_id(db, user.pending_promo_id)
+                if promo and promo_q.is_available(promo):
+                    tariff_hint = f"тариф «{promo.discount_tariff_id}»" if promo.discount_tariff_id else "любой тариф"
+                    if promo.discount_tariff_id:
+                        t_obj = await tariffs_q.get_tariff(db, promo.discount_tariff_id)
+                        tariff_hint = f"тариф «{t_obj.name}»" if t_obj else tariff_hint
+                    lines.append(f"\n🎫 <b>Скидочный код активен:</b> −{promo.discount_stars}⭐ на {tariff_hint}")
+            text = "\n\n".join(lines)
             markup = tariffs_kb(tariffs, prefix="buy")
     if edit:
         await target.edit_text(text, reply_markup=markup)
@@ -183,5 +199,5 @@ async def on_successful_payment(message: Message, user: User, db: AsyncSession) 
     )
     await message.answer(
         "✅ <b>Подписка активирована!</b> Приятного использования.",
-        reply_markup=main_menu(),
+        reply_markup=main_menu_sub(),
     )
