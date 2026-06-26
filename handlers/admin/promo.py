@@ -19,6 +19,7 @@ router = Router(name="admin-promo")
 
 # code -> (минуты доступа | None, человекочитаемая метка)
 DURATION_MAP = {
+    "m1": (1, "1 минута"),
     "h1": (60, "1 час"),
     "d1": (1440, "1 день"),
     "d7": (10080, "7 дней"),
@@ -76,7 +77,8 @@ async def st_code_expiry(message: Message, state: FSMContext) -> None:
     code_expires = None
     if raw != "/skip":
         try:
-            code_expires = datetime.strptime(raw, "%d.%m.%Y").replace(tzinfo=timezone.utc)
+            code_expires = datetime.strptime(
+                raw, "%d.%m.%Y").replace(tzinfo=timezone.utc)
         except ValueError:
             await message.answer("Формат даты: ДД.ММ.ГГГГ (или /skip). Попробуй ещё раз:")
             return
@@ -93,7 +95,8 @@ async def st_note(message: Message, db: AsyncSession, admin: Admin, state: FSMCo
 
     code = generate_code(8)
     code_expires_raw = data.get("code_expires")
-    code_expires = datetime.fromisoformat(code_expires_raw) if code_expires_raw else None
+    code_expires = datetime.fromisoformat(
+        code_expires_raw) if code_expires_raw else None
 
     await promo_q.create_promo(
         db,

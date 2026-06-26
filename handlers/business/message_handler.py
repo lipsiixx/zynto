@@ -65,6 +65,11 @@ async def on_business_message(message: Message, db: AsyncSession, bot: Bot) -> N
     if owner is None:
         return
 
+    sender = message.from_user
+    bot_id = int(bot.token.split(":")[0])
+    if sender and sender.id == bot_id:
+        return
+
     data = extract(message)
 
     local_path = None
@@ -73,7 +78,6 @@ async def on_business_message(message: Message, db: AsyncSession, bot: Bot) -> N
             bot, db, data.file_id, data.file_unique_id, data.message_type, data.file_size, data.mime_type
         )
 
-    sender = message.from_user
     is_outgoing = bool(sender and sender.id == owner.telegram_id)
 
     await messages_q.save_message(

@@ -108,7 +108,7 @@ def setup_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="UTC")
     scheduler.add_job(cleaner.run_cleanup, "interval", hours=24, id="cleanup")
     scheduler.add_job(check_expired_subscriptions, "interval",
-                      minutes=60, id="check_expired")
+                      minutes=5, id="check_expired")
     return scheduler
 
 

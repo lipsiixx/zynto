@@ -40,16 +40,19 @@ def tariffs_list_kb(tariffs: list[Tariff]) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     for t in tariffs:
         state = "👁" if t.is_active else "🙈"
-        kb.button(text=f"{state} {t.name} — {t.price_stars}⭐", callback_data=f"a:tariff:{t.id}")
+        kb.button(text=f"{state} {t.name} — {t.price_stars}⭐",
+                  callback_data=f"a:tariff:{t.id}")
     kb.adjust(1)
-    kb.row(InlineKeyboardButton(text="➕ Создать тариф", callback_data="a:tariff_new"))
+    kb.row(InlineKeyboardButton(
+        text="➕ Создать тариф", callback_data="a:tariff_new"))
     kb.row(InlineKeyboardButton(text="⬅️ В админку", callback_data="a:main"))
     return kb.as_markup()
 
 
 def tariff_actions_kb(tariff: Tariff) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text="✏️ Редактировать", callback_data=f"a:tariff_edit:{tariff.id}")
+    kb.button(text="✏️ Редактировать",
+              callback_data=f"a:tariff_edit:{tariff.id}")
     toggle = "🙈 Скрыть" if tariff.is_active else "👁 Показать"
     kb.button(text=toggle, callback_data=f"a:tariff_toggle:{tariff.id}")
     kb.button(text="🗑 Удалить", callback_data=f"a:tariff_del:{tariff.id}")
@@ -94,7 +97,7 @@ def promo_menu_kb() -> InlineKeyboardMarkup:
 def promo_duration_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     options = [
-        ("1 час", "h1"), ("1 день", "d1"), ("7 дней", "d7"),
+        ("1 минута", "m1"), ("1 час", "h1"), ("1 день", "d1"), ("7 дней", "d7"),
         ("1 месяц", "d30"), ("3 месяца", "d90"), ("Навсегда", "life"),
         ("Ввести вручную", "custom"),
     ]
@@ -129,10 +132,13 @@ def user_profile_kb(target_id: int, is_banned: bool) -> InlineKeyboardMarkup:
 def admins_list_kb(admins) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     for a in admins:
-        name = a.full_name or (f"@{a.username}" if a.username else str(a.telegram_id))
-        kb.button(text=f"🗑 {name}", callback_data=f"a:admin_del:{a.telegram_id}")
+        name = a.full_name or (
+            f"@{a.username}" if a.username else str(a.telegram_id))
+        kb.button(text=f"🗑 {name}",
+                  callback_data=f"a:admin_del:{a.telegram_id}")
     kb.adjust(1)
-    kb.row(InlineKeyboardButton(text="➕ Добавить админа", callback_data="a:admin_add"))
+    kb.row(InlineKeyboardButton(
+        text="➕ Добавить админа", callback_data="a:admin_add"))
     kb.row(InlineKeyboardButton(text="⬅️ В админку", callback_data="a:main"))
     return kb.as_markup()
 
@@ -140,7 +146,8 @@ def admins_list_kb(admins) -> InlineKeyboardMarkup:
 def grant_tariffs_kb(tariffs: list[Tariff], target_id: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     for t in tariffs:
-        kb.button(text=f"{t.name}", callback_data=f"a:grantt:{target_id}:{t.id}")
+        kb.button(text=f"{t.name}",
+                  callback_data=f"a:grantt:{target_id}:{t.id}")
     kb.button(text="❌ Отмена", callback_data="a:main")
     kb.adjust(1)
     return kb.as_markup()

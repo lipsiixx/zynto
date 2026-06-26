@@ -123,7 +123,7 @@ def has_active_subscription(user: User) -> bool:
 
 
 async def check_expired_subscriptions() -> int:
-    """Крон: помечает истёкшие подписки статусом expired. Возвращает количество."""
+    """Крон: помечает истёкшие подписки и уведомляет пользователей."""
     now = _now()
     async with SessionLocal() as db:
         res = await db.execute(
@@ -145,4 +145,35 @@ async def check_expired_subscriptions() -> int:
             )
             await db.commit()
         logger.info("check_expired_subscriptions: помечено %s истёкших", len(ids))
-        return len(ids)
+
+    if ids:
+        await _notify_expired(ids)
+
+    return len(ids)
+
+
+async def _notify_expired(user_ids: list[int]) -> None:
+    from keyboards.user_kb import tariffs_kb
+    from services.notifier import get_notifier
+    from database.queries import tariffs as tariffs_q
+
+    try:
+        bot = get_notifier().bot
+    except AssertionError:
+        logger.warning("Notifier не инициализирован, уведомления об истечении не отправлены")
+        return
+
+    async with SessionLocal() as db:
+        tariff_list = await tariffs_q.list_tariffs(db, only_active=True)
+    kb = tariffs_kb(tariff_list, prefix="buy")
+
+    for user_id in user_ids:
+        try:
+            await bot.send_message(
+                user_id,
+                "😔 <b>Ваша подписка истекла.</b>\n\n"
+                "Оформите новую, чтобы продолжить получать уведомления об удалённых и изменённых сообщениях.",
+                reply_markup=kb,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Не удалось уведомить %s об истечении подписки: %s", user_id, exc)
