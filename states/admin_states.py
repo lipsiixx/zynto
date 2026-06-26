@@ -66,3 +66,10 @@ class ReferralSettingsStates(StatesGroup):
 class CourseEditStates(StatesGroup):
     waiting_video = State()
     waiting_caption = State()
+
+
+class NudgeStates(StatesGroup):
+    waiting_text = State()       # добавление нового сообщения
+    waiting_edit_text = State()  # редактирование существующего
+    waiting_interval = State()   # изменение периодичности
+    waiting_grace = State()      # изменение порога (дней после истечения)

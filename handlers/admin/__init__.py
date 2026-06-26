@@ -6,6 +6,7 @@ from . import (
     broadcast,
     cleanup,
     course,
+    nudge,
     panel,
     promo,
     proxy,
@@ -31,4 +32,5 @@ def get_admin_router() -> Router:
     router.include_router(cleanup.router)
     router.include_router(referral.router)
     router.include_router(course.router)
+    router.include_router(nudge.router)
     return router

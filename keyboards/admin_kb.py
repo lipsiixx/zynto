@@ -18,6 +18,7 @@ def admin_main(is_superadmin: bool) -> InlineKeyboardMarkup:
     kb.button(text="📢 Рассылка", callback_data="a:broadcast")
     kb.button(text="🤝 Рефералы", callback_data="a:referral")
     kb.button(text="📹 Курс для пользователей", callback_data="a:course")
+    kb.button(text="💬 Подначивания", callback_data="a:nudge")
     if is_superadmin:
         kb.button(text="👮 Управление админами", callback_data="a:admins")
         kb.button(text="⚙️ Настройки очистки", callback_data="a:cleanup")
@@ -197,6 +198,41 @@ def course_kb(is_enabled: bool) -> InlineKeyboardMarkup:
     kb.button(text="📹 Загрузить видео", callback_data="a:course_video")
     kb.button(text="✏️ Изменить подпись", callback_data="a:course_caption")
     kb.button(text="⬅️ В админку", callback_data="a:main")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def nudge_main_kb(is_enabled: bool) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    toggle = "❌ Выключить" if is_enabled else "✅ Включить"
+    kb.button(text=toggle, callback_data="a:nudge_toggle")
+    kb.button(text="⏱ Периодичность", callback_data="a:nudge_set_interval")
+    kb.button(text="⏳ Порог (дней после истечения)", callback_data="a:nudge_set_grace")
+    kb.button(text="📝 Тексты сообщений", callback_data="a:nudge_msgs")
+    kb.button(text="⬅️ В админку", callback_data="a:main")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def nudge_msgs_kb(messages) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    for m in messages:
+        icon = "🟢" if m.is_active else "🔴"
+        preview = m.text[:35].replace("\n", " ") + ("…" if len(m.text) > 35 else "")
+        kb.button(text=f"{icon} {preview}", callback_data=f"a:nudge_view:{m.id}")
+    kb.adjust(1)
+    kb.row(InlineKeyboardButton(text="➕ Добавить текст", callback_data="a:nudge_add"))
+    kb.row(InlineKeyboardButton(text="⬅️ Настройки", callback_data="a:nudge"))
+    return kb.as_markup()
+
+
+def nudge_msg_kb(msg_id: int, is_active: bool) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    toggle = "🔴 Деактивировать" if is_active else "🟢 Активировать"
+    kb.button(text=toggle, callback_data=f"a:nudge_mtoggle:{msg_id}")
+    kb.button(text="✏️ Редактировать", callback_data=f"a:nudge_edit:{msg_id}")
+    kb.button(text="🗑 Удалить", callback_data=f"a:nudge_del:{msg_id}")
+    kb.button(text="⬅️ К списку", callback_data="a:nudge_msgs")
     kb.adjust(1)
     return kb.as_markup()
 

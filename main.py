@@ -31,6 +31,7 @@ from services import cleaner, media
 from services import notifier as notifier_module
 from services import proxy_monitor as proxy_monitor_module
 from services.notifier import Notifier
+from services.nudge_sender import run_nudge_job
 from services.proxy_monitor import ProxyMonitor
 from services.subscription import check_expired_subscriptions
 
@@ -104,11 +105,13 @@ def setup_middlewares(dp: Dispatcher, user_router, admin_router, redis: Redis | 
     admin_router.callback_query.middleware(AdminCheckMiddleware())
 
 
-def setup_scheduler() -> AsyncIOScheduler:
+def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="UTC")
     scheduler.add_job(cleaner.run_cleanup, "interval", hours=24, id="cleanup")
     scheduler.add_job(check_expired_subscriptions, "interval",
                       minutes=5, id="check_expired")
+    scheduler.add_job(run_nudge_job, "interval", minutes=10,
+                      id="nudge", args=[bot])
     return scheduler
 
 
@@ -231,7 +234,7 @@ async def main() -> None:
 
     register_error_handler(dp, bot)
 
-    scheduler = setup_scheduler()
+    scheduler = setup_scheduler(bot)
     scheduler.start()
 
     await set_commands(bot)

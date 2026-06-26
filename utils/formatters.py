@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import html
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 MAX_TEXT_LEN = 1000
+
+# Московское время UTC+3 — используем для всех отображаемых дат/времени
+MSK = timezone(timedelta(hours=3))
 
 MESSAGE_TYPE_LABELS = {
     "text": "текст",
@@ -29,7 +32,7 @@ def fmt_dt(dt: datetime | None) -> str:
         return "—"
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
-    return dt.strftime("%d.%m.%Y %H:%M")
+    return dt.astimezone(MSK).strftime("%d.%m.%Y %H:%M")
 
 
 def fmt_date(dt: datetime | None) -> str:
@@ -37,7 +40,7 @@ def fmt_date(dt: datetime | None) -> str:
         return "—"
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
-    return dt.strftime("%d.%m.%Y")
+    return dt.astimezone(MSK).strftime("%d.%m.%Y")
 
 
 def type_label(message_type: str) -> str:

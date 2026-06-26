@@ -49,3 +49,9 @@ async def ensure_defaults(db: AsyncSession) -> None:
         await set_setting(db, "course_enabled", "0")
     if await get_setting(db, "course_caption") is None:
         await set_setting(db, "course_caption", "📚 Курс по использованию бота")
+    if await get_setting(db, "nudge_enabled") is None:
+        await set_setting(db, "nudge_enabled", "0")
+    if await get_setting(db, "nudge_interval_days") is None:
+        await set_setting(db, "nudge_interval_days", "1")
+    if await get_setting(db, "nudge_grace_days") is None:
+        await set_setting(db, "nudge_grace_days", "3")

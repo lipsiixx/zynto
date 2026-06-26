@@ -42,6 +42,8 @@ class User(Base):
     pending_promo_id: Mapped[int | None] = mapped_column(BigInteger)  # ожидающий скидочный промокод
     referred_by: Mapped[int | None] = mapped_column(BigInteger)       # telegram_id пригласившего
     referral_rewarded: Mapped[bool] = mapped_column(Boolean, server_default="false", default=False)
+    nudge_sent_at: Mapped[datetime | None] = mapped_column(_ts())     # последний раз отправлено подначивание
+    nudge_next_at: Mapped[datetime | None] = mapped_column(_ts())     # запланированное время следующего
     created_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
     last_active_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
 
@@ -179,6 +181,15 @@ class MediaCache(Base):
     local_path: Mapped[str | None] = mapped_column(Text)
     cached_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
     last_used_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
+
+
+class NudgeMessage(Base):
+    __tablename__ = "nudge_messages"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
 
 
 class BotSetting(Base):
