@@ -41,10 +41,7 @@ async def _heal_connection(db: AsyncSession, bot: Bot, bc_id: str):
 
 
 async def resolve_owner(db: AsyncSession, bc_id: str, bot: Bot | None = None) -> User | None:
-    """Возвращает владельца бизнес-аккаунта по business_connection_id, если подписка активна.
-
-    Если записи о подключении нет, а `bot` передан — пытается восстановить её через API
-    (на случай потерянного апдейта business_connection)."""
+    """Возвращает владельца бизнес-аккаунта по business_connection_id, если подписка активна."""
     conn = await business_q.get_by_connection_id(db, bc_id)
     if conn is None and bot is not None:
         conn = await _heal_connection(db, bot, bc_id)
@@ -56,44 +53,92 @@ async def resolve_owner(db: AsyncSession, bc_id: str, bot: Bot | None = None) ->
     return owner
 
 
-async def _try_heal_media_from_reply(
-    db: AsyncSession, bot: Bot, owner, reply_msg: Message
+async def _try_capture_view_once(
+    db: AsyncSession, bot: Bot, owner: User, parent_message: Message
 ) -> None:
-    """Пытаемся скачать медиа из reply_to_message.
+    """Перехватываем view-once медиа из reply_to_message.
 
-    Актуально для одноразовых (view-once) фото/видео: при первом получении
-    Telegram не отдаёт боту файл, но при ответе на такое сообщение передаёт
-    оригинал в поле reply_to_message с доступным file_id.
+    View-once фото/видео не приходят как обычный business_message — Telegram их скрывает.
+    Но когда владелец отвечает на такое сообщение, оригинал доступен в reply_to_message.
+    Мы скачиваем его, сохраняем и немедленно отправляем владельцу.
     """
+    reply_msg = parent_message.reply_to_message
+    if not reply_msg:
+        return
+
     data = extract(reply_msg)
-    logger.debug(
-        "reply_to_message: msg_id=%s type=%s file_id=%s",
+    logger.info(
+        "reply_to_message обнаружен: msg_id=%s type=%s file_id=%s has_photo=%s has_video=%s",
         reply_msg.message_id, data.message_type,
-        (data.file_id or "")[:30] if data.file_id else "нет",
+        (data.file_id[:25] + "...") if data.file_id else "нет",
+        bool(reply_msg.photo),
+        bool(reply_msg.video),
     )
+
     if not data.file_id or not data.file_unique_id:
+        # reply_to_message тоже без медиа — Telegram не отдаёт view-once через Bot API
         logger.info(
-            "reply_to_message без медиа (msg_id=%s type=%s) — view-once не перехвачено",
-            reply_msg.message_id, data.message_type,
+            "reply_to_message (msg_id=%s) без медиа — view-once недоступен через Bot API",
+            reply_msg.message_id,
         )
         return
-    record = await messages_q.find_message(
-        db, owner.telegram_id, reply_msg.chat.id, reply_msg.message_id
-    )
-    if record is None:
-        logger.debug("reply_to_message msg_id=%s не найдено в БД", reply_msg.message_id)
-        return
-    if record.local_path is not None:
-        return  # медиа уже скачано ранее
+
+    chat_id = reply_msg.chat.id
+
+    # Проверяем, есть ли уже запись с медиа
+    record = await messages_q.find_message(db, owner.telegram_id, chat_id, reply_msg.message_id)
+    if record is not None and record.local_path is not None:
+        return  # медиа уже есть — ничего не делаем
+
     logger.info(
-        "Пытаемся восстановить view-once медиа: user=%s msg_id=%s type=%s",
+        "Пытаемся перехватить view-once: user=%s msg_id=%s type=%s запись_в_бд=%s",
         owner.telegram_id, reply_msg.message_id, data.message_type,
+        "есть_без_файла" if record else "отсутствует",
     )
+
     local_path = await media_service.get_or_cache_media(
         bot, db, data.file_id, data.file_unique_id,
-        data.message_type, data.file_size, data.mime_type
+        data.message_type, data.file_size, data.mime_type,
     )
-    if local_path:
+
+    if not local_path:
+        logger.warning(
+            "Не удалось скачать view-once из reply_to_message: user=%s msg_id=%s — "
+            "Telegram не разрешает скачивание (file_id=%.25s)",
+            owner.telegram_id, reply_msg.message_id, data.file_id,
+        )
+        return
+
+    sender = reply_msg.from_user
+    is_outgoing = bool(sender and sender.id == owner.telegram_id)
+    bc_id = parent_message.business_connection_id
+
+    if record is None:
+        # Запись вообще не существует — создаём
+        record = await messages_q.save_message(
+            db,
+            user_id=owner.telegram_id,
+            business_connection_id=bc_id,
+            message_id=reply_msg.message_id,
+            chat_id=chat_id,
+            chat_title=chat_title(reply_msg),
+            sender_id=sender.id if sender else None,
+            sender_name=sender.full_name if sender else None,
+            sender_username=sender.username if sender else None,
+            is_outgoing=is_outgoing,
+            message_type=data.message_type,
+            text_content=data.text_content,
+            file_id=data.file_id,
+            file_unique_id=data.file_unique_id,
+            file_size=data.file_size,
+            local_path=local_path,
+            mime_type=data.mime_type,
+            duration_seconds=data.duration_seconds,
+            width=data.width,
+            height=data.height,
+        )
+    else:
+        # Запись есть, но без файла — обновляем
         await messages_q.update_media_fields(
             db, record,
             file_id=data.file_id,
@@ -105,17 +150,16 @@ async def _try_heal_media_from_reply(
             width=data.width,
             height=data.height,
         )
-        logger.info(
-            "Медиа восстановлено из контекста ответа: user=%s msg_id=%s type=%s",
-            owner.telegram_id, reply_msg.message_id, data.message_type,
-        )
+
+    logger.info(
+        "View-once медиа перехвачено: user=%s msg_id=%s type=%s",
+        owner.telegram_id, reply_msg.message_id, data.message_type,
+    )
+
+    # Уведомляем немедленно (не ждём события удаления) если сообщение входящее
+    if not is_outgoing:
         from services.notifier import get_notifier
         await get_notifier().notify_one_time_captured(owner.telegram_id, record)
-    else:
-        logger.warning(
-            "Не удалось скачать view-once медиа из reply_to_message: user=%s msg_id=%s",
-            owner.telegram_id, reply_msg.message_id,
-        )
 
 
 @router.business_message()
@@ -133,13 +177,12 @@ async def on_business_message(message: Message, db: AsyncSession, bot: Bot) -> N
         return
 
     data = extract(message)
-    logger.debug(
-        "business_message: user=%s chat=%s msg=%s type=%s file_id=%s has_photo=%s has_video=%s",
-        owner.telegram_id, message.chat.id, message.message_id,
-        data.message_type,
-        (data.file_id or "")[:20] if data.file_id else "нет",
-        bool(message.photo),
-        bool(message.video),
+    logger.info(
+        "business_message: user=%s msg=%s type=%s file_id=%s has_photo=%s has_video=%s reply=%s",
+        owner.telegram_id, message.message_id, data.message_type,
+        (data.file_id[:20] + "...") if data.file_id else "нет",
+        bool(message.photo), bool(message.video),
+        bool(message.reply_to_message),
     )
 
     local_path = None
@@ -173,8 +216,6 @@ async def on_business_message(message: Message, db: AsyncSession, bot: Bot) -> N
         height=data.height,
     )
 
-    # Если это ответ на сообщение — пытаемся подтянуть медиа, которое не удалось
-    # скачать при первом получении (view-once фото/видео).
+    # Если ответ на сообщение — пытаемся перехватить view-once медиа из reply_to_message
     if message.reply_to_message:
-        await _try_heal_media_from_reply(db, bot, owner, message.reply_to_message)
-    # Никаких уведомлений при обычном получении — только при удалении/изменении.
+        await _try_capture_view_once(db, bot, owner, message)
