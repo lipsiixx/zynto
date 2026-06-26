@@ -140,6 +140,34 @@ async def count_edited(db: AsyncSession) -> int:
     return int(res.scalar() or 0)
 
 
+async def update_media_fields(
+    db: AsyncSession,
+    record: MessageLog,
+    *,
+    file_id: str,
+    file_unique_id: str,
+    message_type: str,
+    local_path: str | None,
+    file_size: int | None = None,
+    mime_type: str | None = None,
+    width: int | None = None,
+    height: int | None = None,
+) -> None:
+    record.file_id = file_id
+    record.file_unique_id = file_unique_id
+    record.message_type = message_type
+    record.local_path = local_path
+    if file_size is not None:
+        record.file_size = file_size
+    if mime_type is not None:
+        record.mime_type = mime_type
+    if width is not None:
+        record.width = width
+    if height is not None:
+        record.height = height
+    await db.commit()
+
+
 async def count_for_user(db: AsyncSession, user_id: int) -> int:
     res = await db.execute(select(func.count(MessageLog.id)).where(MessageLog.user_id == user_id))
     return int(res.scalar() or 0)

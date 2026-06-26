@@ -56,6 +56,45 @@ async def resolve_owner(db: AsyncSession, bc_id: str, bot: Bot | None = None) ->
     return owner
 
 
+async def _try_heal_media_from_reply(
+    db: AsyncSession, bot: Bot, owner, reply_msg: Message
+) -> None:
+    """Пытаемся скачать медиа из reply_to_message.
+
+    Актуально для одноразовых (view-once) фото/видео: при первом получении
+    Telegram не отдаёт боту файл, но при ответе на такое сообщение передаёт
+    оригинал в поле reply_to_message с доступным file_id.
+    """
+    data = extract(reply_msg)
+    if not data.file_id or not data.file_unique_id:
+        return
+    record = await messages_q.find_message(
+        db, owner.telegram_id, reply_msg.chat.id, reply_msg.message_id
+    )
+    if record is None or record.local_path is not None:
+        return  # не отслеживаем или медиа уже скачано
+    local_path = await media_service.get_or_cache_media(
+        bot, db, data.file_id, data.file_unique_id,
+        data.message_type, data.file_size, data.mime_type
+    )
+    if local_path:
+        await messages_q.update_media_fields(
+            db, record,
+            file_id=data.file_id,
+            file_unique_id=data.file_unique_id,
+            message_type=data.message_type,
+            local_path=local_path,
+            file_size=data.file_size,
+            mime_type=data.mime_type,
+            width=data.width,
+            height=data.height,
+        )
+        logger.info(
+            "Медиа восстановлено из контекста ответа: user=%s msg_id=%s type=%s",
+            owner.telegram_id, reply_msg.message_id, data.message_type,
+        )
+
+
 @router.business_message()
 async def on_business_message(message: Message, db: AsyncSession, bot: Bot) -> None:
     bc_id = message.business_connection_id
@@ -102,4 +141,9 @@ async def on_business_message(message: Message, db: AsyncSession, bot: Bot) -> N
         width=data.width,
         height=data.height,
     )
+
+    # Если это ответ на сообщение — пытаемся подтянуть медиа, которое не удалось
+    # скачать при первом получении (view-once фото/видео).
+    if message.reply_to_message:
+        await _try_heal_media_from_reply(db, bot, owner, message.reply_to_message)
     # Никаких уведомлений при обычном получении — только при удалении/изменении.
