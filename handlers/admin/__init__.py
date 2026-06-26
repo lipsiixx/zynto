@@ -3,6 +3,7 @@ from aiogram import Router
 
 from . import (
     admins_mgmt,
+    broadcast,
     cleanup,
     panel,
     promo,
@@ -17,6 +18,7 @@ from . import (
 def get_admin_router() -> Router:
     router = Router(name="admin")
     router.include_router(panel.router)
+    router.include_router(broadcast.router)
     router.include_router(tariffs.router)
     router.include_router(promo.router)
     router.include_router(stats.router)

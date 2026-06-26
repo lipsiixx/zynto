@@ -99,6 +99,14 @@ async def count_by_status(db: AsyncSession, status: str) -> int:
     return int(res.scalar() or 0)
 
 
+async def get_broadcast_recipients(db: AsyncSession) -> list[int]:
+    """Все telegram_id пользователей, которым можно отправить рассылку."""
+    res = await db.execute(
+        select(User.telegram_id).where(User.is_blocked == False, User.is_banned == False)  # noqa: E712
+    )
+    return [r[0] for r in res.all()]
+
+
 async def set_pending_promo(db: AsyncSession, telegram_id: int, promo_id: int | None) -> None:
     await db.execute(update(User).where(User.telegram_id == telegram_id).values(pending_promo_id=promo_id))
     await db.commit()

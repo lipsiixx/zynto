@@ -52,3 +52,8 @@ class ManualSubscriptionStates(StatesGroup):
 
 class FindUserStates(StatesGroup):
     waiting_identifier = State()
+
+
+class BroadcastStates(StatesGroup):
+    waiting_content = State()
+    confirm = State()

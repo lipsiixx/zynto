@@ -15,6 +15,7 @@ def admin_main(is_superadmin: bool) -> InlineKeyboardMarkup:
     kb.button(text="🖥 Сервер", callback_data="a:server")
     kb.button(text="🌐 Прокси", callback_data="a:proxy")
     kb.button(text="👤 Пользователи", callback_data="a:users")
+    kb.button(text="📢 Рассылка", callback_data="a:broadcast")
     if is_superadmin:
         kb.button(text="👮 Управление админами", callback_data="a:admins")
         kb.button(text="⚙️ Настройки очистки", callback_data="a:cleanup")
@@ -78,6 +79,14 @@ def confirm_kb(yes_cb: str, no_cb: str = "a:main") -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="✅ Создать", callback_data=yes_cb)
     kb.button(text="❌ Отмена", callback_data=no_cb)
+    kb.adjust(2)
+    return kb.as_markup()
+
+
+def broadcast_confirm_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="✅ Отправить", callback_data="a:broadcast_confirm")
+    kb.button(text="❌ Отмена", callback_data="a:main")
     kb.adjust(2)
     return kb.as_markup()
 
