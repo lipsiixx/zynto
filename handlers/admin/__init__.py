@@ -5,6 +5,7 @@ from . import (
     admins_mgmt,
     broadcast,
     cleanup,
+    course,
     panel,
     promo,
     proxy,
@@ -29,4 +30,5 @@ def get_admin_router() -> Router:
     router.include_router(admins_mgmt.router)
     router.include_router(cleanup.router)
     router.include_router(referral.router)
+    router.include_router(course.router)
     return router

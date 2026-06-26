@@ -61,3 +61,8 @@ class BroadcastStates(StatesGroup):
 
 class ReferralSettingsStates(StatesGroup):
     waiting_bonus_days = State()
+
+
+class CourseEditStates(StatesGroup):
+    waiting_video = State()
+    waiting_caption = State()

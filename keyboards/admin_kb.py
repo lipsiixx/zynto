@@ -17,6 +17,7 @@ def admin_main(is_superadmin: bool) -> InlineKeyboardMarkup:
     kb.button(text="👤 Пользователи", callback_data="a:users")
     kb.button(text="📢 Рассылка", callback_data="a:broadcast")
     kb.button(text="🤝 Рефералы", callback_data="a:referral")
+    kb.button(text="📹 Курс для пользователей", callback_data="a:course")
     if is_superadmin:
         kb.button(text="👮 Управление админами", callback_data="a:admins")
         kb.button(text="⚙️ Настройки очистки", callback_data="a:cleanup")
@@ -186,6 +187,17 @@ def admins_list_kb(admins) -> InlineKeyboardMarkup:
     kb.row(InlineKeyboardButton(
         text="➕ Добавить админа", callback_data="a:admin_add"))
     kb.row(InlineKeyboardButton(text="⬅️ В админку", callback_data="a:main"))
+    return kb.as_markup()
+
+
+def course_kb(is_enabled: bool) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    toggle = "❌ Выключить курс" if is_enabled else "✅ Включить курс"
+    kb.button(text=toggle, callback_data="a:course_toggle")
+    kb.button(text="📹 Загрузить видео", callback_data="a:course_video")
+    kb.button(text="✏️ Изменить подпись", callback_data="a:course_caption")
+    kb.button(text="⬅️ В админку", callback_data="a:main")
+    kb.adjust(1)
     return kb.as_markup()
 
 

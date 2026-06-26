@@ -19,6 +19,7 @@ from database.queries import promo_codes as promo_q
 from database.queries import settings as settings_q
 from database.queries import tariffs as tariffs_q
 from database.queries import users as users_q
+from handlers.user.course import send_course_after_activation
 from keyboards.user_kb import (
     back_to_menu,
     main_menu_sub,
@@ -227,3 +228,4 @@ async def on_successful_payment(message: Message, user: User, db: AsyncSession, 
         "✅ <b>Подписка активирована!</b> Приятного использования.",
         reply_markup=main_menu_sub(),
     )
+    await send_course_after_activation(message, db, bot)

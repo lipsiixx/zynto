@@ -45,3 +45,7 @@ async def ensure_defaults(db: AsyncSession) -> None:
         await set_setting(db, "log_retention_days", str(cfg.log_retention_days))
     if await get_setting(db, "referral_bonus_days") is None:
         await set_setting(db, "referral_bonus_days", "1")
+    if await get_setting(db, "course_enabled") is None:
+        await set_setting(db, "course_enabled", "0")
+    if await get_setting(db, "course_caption") is None:
+        await set_setting(db, "course_caption", "📚 Курс по использованию бота")

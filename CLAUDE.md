@@ -40,8 +40,10 @@ business-апдейты.
     promo_codes, messages, business, media, settings). Хендлеры НЕ пишут SQL напрямую.
 - `handlers/`
   - `user/` — start, subscription (+ оплата Stars, pre_checkout, successful_payment),
-    activate_code, history, media_gallery, gift. Собираются в `get_user_router()`.
-  - `admin/` — panel, tariffs, promo, stats, server, users_mgmt, admins_mgmt, cleanup.
+    activate_code, history, media_gallery, gift, **course** (просмотр видео-курса).
+    Собираются в `get_user_router()`.
+  - `admin/` — panel, tariffs, promo, stats, server, users_mgmt, admins_mgmt, cleanup,
+    **course** (управление курсом: вкл/выкл, загрузка видео, подпись).
     `get_admin_router()`. Колбэки админки имеют префикс `a:`.
   - `business/` — connection, message_handler, edit_handler, delete_handler, extract.
     `get_business_router()`. `resolve_owner()` в message_handler — общий помощник.
@@ -50,6 +52,9 @@ business-апдейты.
 - `services/` — subscription (активация/продление/истечение), media (скачивание/кеш/отправка),
   notifier (очередь уведомлений), stats, server_monitor (psutil), cleaner (крон-очистка).
 - `keyboards/`, `states/`, `utils/` — клавиатуры, FSM-состояния, форматтеры/пагинация/генератор кодов.
+- `course_videos/` — папка-заглушка для локальных видео-файлов курса. Сами видео хранятся
+  как Telegram `file_id` в `bot_settings` (ключ `course_video_file_id`). Папка пустая —
+  файлы туда НЕ кладутся, она лишь как ориентир для будущего S3/локального хранилища.
 
 ## Неочевидные решения (НЕ сломай при правках)
 - **Промокоды: `promo_codes.duration_days` хранит МИНУТЫ**, не дни (чтобы поддержать опцию
@@ -75,3 +80,43 @@ business-апдейты.
 пользователь стартует сам через VSCode (F5, конфиг в `.vscode/`).
 Что осознанно НЕ делалось: рефанды Stars (по ТЗ — вручную), S3-хранилище (есть заглушки в
 config/media, по умолчанию local).
+
+## Обновления (хронология)
+
+### 2026-06-26 — Видео-курс для пользователей
+**Что сделано:** система курса по использованию бота.
+
+**Архитектура курса:**
+- Настройки хранятся в `bot_settings` (таблица уже была), три ключа:
+  - `course_enabled` — `"0"` / `"1"` (по умолчанию выключен)
+  - `course_video_file_id` — Telegram file_id загруженного видео
+  - `course_caption` — текст подписи под видео
+- Никакой новой таблицы и миграции НЕ требуется — всё через `BotSetting`.
+- `database/queries/settings.py` → `ensure_defaults()` дополнен тремя ключами выше.
+
+**Файлы (новые):**
+- `handlers/user/course.py` — колбэк `course` (кнопка в меню) + хелпер
+  `send_course_after_activation(target, db, bot)` — используется из subscription.py и activate_code.py.
+- `handlers/admin/course.py` — колбэки `a:course`, `a:course_toggle`, `a:course_video`,
+  `a:course_caption`; FSM-приёмники видео и текста. Роутер подключён в `handlers/admin/__init__.py`.
+- `course_videos/.gitkeep` — пустая папка-заглушка (видео хранятся как file_id, не на диске).
+
+**Файлы (изменены):**
+- `keyboards/user_kb.py` — кнопка «📚 Курс по использованию» добавлена в `main_menu()`
+  (при subscribed=True) и в `main_menu_sub()` (меню после покупки/активации).
+- `keyboards/admin_kb.py` — кнопка «📹 Курс для пользователей» в `admin_main()`;
+  новая функция `course_kb(is_enabled)`.
+- `states/admin_states.py` — добавлен `CourseEditStates` (waiting_video, waiting_caption).
+- `handlers/user/subscription.py` — после `on_successful_payment` вызывает
+  `send_course_after_activation`.
+- `handlers/user/activate_code.py` — `_activate`, `_activate_access`, `cmd_activate`,
+  `on_code_entered` получили параметр `bot: Bot`; после активации кода доступа вызывается
+  `send_course_after_activation`. Скидочный промокод курс НЕ показывает (это не активация доступа).
+- `handlers/user/__init__.py` и `handlers/admin/__init__.py` — подключены новые роутеры.
+
+**Поведение:**
+- Курс выключен по умолчанию. Пока видео не загружено — кнопка в меню показывает alert.
+- После покупки Stars или активации кода доступа — бот шлёт видео отдельным сообщением
+  (если курс включён и видео загружено).
+- В меню пользователя кнопка «📚 Курс» всегда видна при наличии подписки.
+- Проверено: `compileall -q .` и smoke-запуск (polling стартует без ошибок).
