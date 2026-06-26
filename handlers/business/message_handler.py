@@ -66,13 +66,29 @@ async def _try_heal_media_from_reply(
     оригинал в поле reply_to_message с доступным file_id.
     """
     data = extract(reply_msg)
+    logger.debug(
+        "reply_to_message: msg_id=%s type=%s file_id=%s",
+        reply_msg.message_id, data.message_type,
+        (data.file_id or "")[:30] if data.file_id else "нет",
+    )
     if not data.file_id or not data.file_unique_id:
+        logger.info(
+            "reply_to_message без медиа (msg_id=%s type=%s) — view-once не перехвачено",
+            reply_msg.message_id, data.message_type,
+        )
         return
     record = await messages_q.find_message(
         db, owner.telegram_id, reply_msg.chat.id, reply_msg.message_id
     )
-    if record is None or record.local_path is not None:
-        return  # не отслеживаем или медиа уже скачано
+    if record is None:
+        logger.debug("reply_to_message msg_id=%s не найдено в БД", reply_msg.message_id)
+        return
+    if record.local_path is not None:
+        return  # медиа уже скачано ранее
+    logger.info(
+        "Пытаемся восстановить view-once медиа: user=%s msg_id=%s type=%s",
+        owner.telegram_id, reply_msg.message_id, data.message_type,
+    )
     local_path = await media_service.get_or_cache_media(
         bot, db, data.file_id, data.file_unique_id,
         data.message_type, data.file_size, data.mime_type
@@ -93,6 +109,13 @@ async def _try_heal_media_from_reply(
             "Медиа восстановлено из контекста ответа: user=%s msg_id=%s type=%s",
             owner.telegram_id, reply_msg.message_id, data.message_type,
         )
+        from services.notifier import get_notifier
+        await get_notifier().notify_one_time_captured(owner.telegram_id, record)
+    else:
+        logger.warning(
+            "Не удалось скачать view-once медиа из reply_to_message: user=%s msg_id=%s",
+            owner.telegram_id, reply_msg.message_id,
+        )
 
 
 @router.business_message()
@@ -110,6 +133,14 @@ async def on_business_message(message: Message, db: AsyncSession, bot: Bot) -> N
         return
 
     data = extract(message)
+    logger.debug(
+        "business_message: user=%s chat=%s msg=%s type=%s file_id=%s has_photo=%s has_video=%s",
+        owner.telegram_id, message.chat.id, message.message_id,
+        data.message_type,
+        (data.file_id or "")[:20] if data.file_id else "нет",
+        bool(message.photo),
+        bool(message.video),
+    )
 
     local_path = None
     if data.file_id and data.file_unique_id:

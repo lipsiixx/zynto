@@ -111,6 +111,10 @@ class Notifier:
     async def notify_edited(self, target_user_id: int, record: MessageLog) -> None:
         await self.queue.put({"kind": "edited", "target": target_user_id, "record": record})
 
+    async def notify_one_time_captured(self, target_user_id: int, record: MessageLog) -> None:
+        """Одноразовое медиа перехвачено через контекст ответа."""
+        await self.queue.put({"kind": "one_time", "target": target_user_id, "record": record})
+
     async def _worker(self) -> None:
         task = asyncio.current_task()
         try:
@@ -183,6 +187,8 @@ class Notifier:
             await self._send_deleted(target, record, tag, footer)
         elif kind == "edited":
             await self._send_edited(target, record, tag, footer)
+        elif kind == "one_time":
+            await self._send_one_time(target, record, tag, footer)
 
     async def _send_deleted(self, target: int, record: MessageLog, tag: str, footer: str) -> None:
         when_del = fmt_dt(record.deleted_at)
@@ -208,6 +214,16 @@ class Notifier:
                 f"{footer}"
             )
             await self.bot.send_message(target, text)
+
+    async def _send_one_time(self, target: int, record: MessageLog, tag: str, footer: str) -> None:
+        caption = (
+            f"📎 <b>Одноразовое медиа перехвачено</b> 🔮\n\n"
+            f"👤 <b>Кто:</b> {tag}\n"
+            f"🟪 <b>Тип:</b> {type_label(record.message_type)}\n\n"
+            f"💡 <i>Бот сохранил это медиа при ответе пользователя.</i>\n\n"
+            f"{footer}"
+        )
+        await media_service.send_media(self.bot, target, record, caption)
 
     async def _send_edited(self, target: int, record: MessageLog, tag: str, footer: str) -> None:
         when = fmt_dt(record.edited_at)
