@@ -8,6 +8,7 @@ from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramForbiddenError
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
+from aiogram.utils.text_decorations import html_decoration
 
 from database.models import Admin
 from database.queries import users as users_q
@@ -42,7 +43,7 @@ async def on_cancel(message: Message, state: FSMContext, admin: Admin) -> None:
 async def on_content(message: Message, state: FSMContext, db: AsyncSession) -> None:
     if message.photo:
         photo_id = message.photo[-1].file_id
-        caption = message.caption_html or ""
+        caption = html_decoration.unparse(message.caption or "", message.caption_entities or [])
         await state.update_data(photo_id=photo_id, caption=caption, text=None)
     elif message.text:
         await state.update_data(text=message.html_text, photo_id=None, caption=None)
