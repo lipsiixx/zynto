@@ -312,6 +312,102 @@ input[type=range]::-moz-range-thumb {
   font-style: italic;
 }
 
+/* ── Countdown ───────────────────────────────────────────────────────────── */
+.countdown-wrap {
+  text-align: center;
+  padding: 4px 0 2px;
+}
+
+.countdown-label {
+  font-size: 11px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 6px;
+}
+
+.countdown-days {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--purple-l);
+  letter-spacing: -1px;
+}
+
+.countdown-days-h {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text2);
+}
+
+.countdown-days-sm {
+  display: inline;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text2);
+}
+
+.countdown-clock {
+  font-size: 38px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 2px;
+  color: var(--purple-l);
+  font-family: 'SF Mono', 'Menlo', monospace;
+}
+
+.countdown-clock.countdown-urgent {
+  color: var(--red);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.countdown-lifetime {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--purple-l);
+}
+
+.countdown-expired {
+  text-align: center;
+  color: var(--red);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 0;
+}
+
+/* ── No subscription block ───────────────────────────────────────────────── */
+.no-sub-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 36px 16px 24px;
+}
+
+.no-sub-emoji {
+  font-size: 64px;
+  margin-bottom: 16px;
+  filter: grayscale(0.2);
+}
+
+.no-sub-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.no-sub-text {
+  font-size: 14px;
+  color: var(--text2);
+  line-height: 1.6;
+  max-width: 300px;
+}
+
 /* ── Stat chart (bars) ───────────────────────────────────────────────────── */
 .chart-wrap {
   display: flex;
