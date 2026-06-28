@@ -20,8 +20,10 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 def require_auth(
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    token: str | None = Query(default=None),
 ) -> None:
-    if creds is None or not verify_token(creds.credentials):
+    tok = (creds.credentials if creds else None) or token
+    if not tok or not verify_token(tok):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="unauthorized",
