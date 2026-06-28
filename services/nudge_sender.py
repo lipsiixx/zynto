@@ -11,6 +11,7 @@ from aiogram.exceptions import TelegramForbiddenError
 from database.engine import SessionLocal
 from database.queries import nudge as nudge_q
 from database.queries import settings as settings_q
+from keyboards.user_kb import nudge_kb
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,10 @@ async def run_nudge_job(bot: Bot) -> None:
         for user in due_users:
             if nudge_msg is not None:
                 try:
-                    await bot.send_message(user.telegram_id, nudge_msg.text, parse_mode="HTML")
+                    await bot.send_message(
+                        user.telegram_id, nudge_msg.text,
+                        parse_mode="HTML", reply_markup=nudge_kb(),
+                    )
                     user.nudge_sent_at = now_utc
                     logger.info("Nudge отправлен: user=%s", user.telegram_id)
                 except TelegramForbiddenError:

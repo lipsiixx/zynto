@@ -7,6 +7,16 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from database.models import Tariff
 from utils.formatters import duration_text
 
+_STARS_URL = "https://t.me/starsov?start=r8443013313"
+
+
+def _add_stars_premium(kb: InlineKeyboardBuilder) -> None:
+    """Добавляет кнопки покупки Stars и Premium в билдер."""
+    kb.row(
+        InlineKeyboardButton(text="⭐ Купить Stars", url=_STARS_URL),
+        InlineKeyboardButton(text="💎 Купить Premium", url=_STARS_URL),
+    )
+
 
 def main_menu(subscribed: bool = True, connected: bool = False) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
@@ -14,6 +24,9 @@ def main_menu(subscribed: bool = True, connected: bool = False) -> InlineKeyboar
         kb.button(text="💳 Оформить подписку", callback_data="subscription")
         kb.button(text="🎟 Активировать промокод", callback_data="activate")
         kb.button(text="❓ Как это работает", callback_data="how")
+        kb.adjust(1)
+        _add_stars_premium(kb)
+        return kb.as_markup()
     elif not connected:
         kb.button(text="📡 Подключить мониторинг", callback_data="connect")
         kb.button(text="💳 Подписка", callback_data="subscription")
@@ -29,6 +42,7 @@ def main_menu(subscribed: bool = True, connected: bool = False) -> InlineKeyboar
         kb.button(text="🎁 Подарить подписку", callback_data="gift")
         kb.button(text="📚 Курс по использованию", callback_data="course")
     kb.adjust(1)
+    _add_stars_premium(kb)
     return kb.as_markup()
 
 
@@ -56,6 +70,7 @@ def subscribe_button() -> InlineKeyboardMarkup:
     kb.button(text="💳 Оформить подписку", callback_data="subscription")
     kb.button(text="⬅️ В меню", callback_data="menu")
     kb.adjust(1)
+    _add_stars_premium(kb)
     return kb.as_markup()
 
 
@@ -66,6 +81,7 @@ def tariffs_kb(tariffs: list[Tariff], prefix: str = "buy") -> InlineKeyboardMark
     kb.button(text="🎟 Активировать код", callback_data="activate")
     kb.button(text="⬅️ В меню", callback_data="menu")
     kb.adjust(1)
+    _add_stars_premium(kb)
     return kb.as_markup()
 
 
@@ -74,6 +90,7 @@ def renew_kb() -> InlineKeyboardMarkup:
     kb.button(text="🔄 Продлить", callback_data="renew")
     kb.button(text="⬅️ В меню", callback_data="menu")
     kb.adjust(1)
+    _add_stars_premium(kb)
     return kb.as_markup()
 
 
@@ -139,4 +156,13 @@ def gift_tariffs_kb(tariffs: list[Tariff]) -> InlineKeyboardMarkup:
                   callback_data=f"giftbuy:{t.id}")
     kb.button(text="⬅️ В меню", callback_data="menu")
     kb.adjust(1)
+    return kb.as_markup()
+
+
+def nudge_kb() -> InlineKeyboardMarkup:
+    """Клавиатура к подначивающему сообщению: подписка + Stars/Premium."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="💳 Оформить подписку", callback_data="subscription")
+    kb.adjust(1)
+    _add_stars_premium(kb)
     return kb.as_markup()
