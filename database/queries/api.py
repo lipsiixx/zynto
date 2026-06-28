@@ -269,6 +269,10 @@ async def get_graph(
         if r.source_tg in valid_subs
     ]
 
+    # Контакты без валидных рёбер (подписчик без User-записи) — не включаем в граф
+    valid_contact_ids = {r.target_id for r in edge_rows if r.source_tg in valid_subs}
+    nodes = [n for n in nodes if n["type"] != "contact" or int(n["id"][2:]) in valid_contact_ids]
+
     return {"nodes": nodes, "edges": edges}
 
 

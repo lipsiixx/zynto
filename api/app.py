@@ -1,9 +1,12 @@
 """FastAPI-приложение REST API для веб-панели администратора."""
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from api import auth, ws
 from api.routers import cache, chats, graph, media, stats, users
@@ -48,3 +51,20 @@ app.include_router(cache.router, prefix=PREFIX)
 @app.get("/v1/health")
 async def health() -> dict:
     return {"status": "ok"}
+
+
+# ── Раздача React SPA ──────────────────────────────────────────────────────
+_SPA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "static")
+
+if os.path.isdir(_SPA_DIR):
+    _assets = os.path.join(_SPA_DIR, "assets")
+    if os.path.isdir(_assets):
+        app.mount("/assets", StaticFiles(directory=_assets), name="spa_assets")
+
+    @app.get("/", include_in_schema=False)
+    async def _spa_root() -> FileResponse:
+        return FileResponse(os.path.join(_SPA_DIR, "index.html"))
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def _spa_fallback(full_path: str) -> FileResponse:
+        return FileResponse(os.path.join(_SPA_DIR, "index.html"))
