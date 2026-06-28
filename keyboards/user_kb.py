@@ -33,7 +33,6 @@ def main_menu(subscribed: bool = True, connected: bool = False) -> InlineKeyboar
         kb.button(text="👥 Пригласить друга", callback_data="referral")
         kb.button(text="🎁 Подарить подписку", callback_data="gift")
         kb.button(text="📚 Курс по использованию", callback_data="course")
-        kb.button(text="❓ Как подключить", callback_data="how")
     else:
         kb.button(text="📋 История сообщений", callback_data="history")
         kb.button(text="📡 Мониторинг", callback_data="connect")

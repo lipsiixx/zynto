@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -107,7 +108,11 @@ async def cmd_menu(message: Message, user: User, db: AsyncSession, state: FSMCon
 async def cb_menu(call: CallbackQuery, user: User, db: AsyncSession, state: FSMContext) -> None:
     await state.clear()
     text, markup = await _home_text(user, db)
-    await call.message.edit_text(text, reply_markup=markup)
+    try:
+        await call.message.edit_text(text, reply_markup=markup)
+    except TelegramBadRequest:
+        await call.message.delete()
+        await call.message.answer(text, reply_markup=markup)
     await call.answer()
 
 
