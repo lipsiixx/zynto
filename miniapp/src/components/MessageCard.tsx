@@ -28,7 +28,7 @@ const TYPE_LABEL: Record<string, string> = {
   animation: '🎞 GIF',
 }
 
-const MEDIA_TYPES = new Set(['photo', 'video', 'audio', 'voice', 'video_note', 'animation', 'sticker'])
+const MEDIA_TYPES = new Set(['photo', 'video', 'audio', 'voice', 'video_note', 'animation'])
 
 function MediaBlock({ event }: { event: MessageEvent }) {
   const [expanded, setExpanded] = useState(false)
@@ -110,21 +110,6 @@ function MediaBlock({ event }: { event: MessageEvent }) {
         {event.duration_seconds ? (
           <div className="media-meta">{fmtDuration(event.duration_seconds)}</div>
         ) : null}
-      </div>
-    )
-  }
-
-  // sticker — показываем как картинку (webp)
-  if (type === 'sticker') {
-    return (
-      <div className="media-block">
-        <img
-          src={url}
-          alt="стикер"
-          className="media-sticker"
-          onError={() => setErrored(true)}
-          loading="lazy"
-        />
       </div>
     )
   }

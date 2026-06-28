@@ -18,32 +18,44 @@
   --text3: #5a5272;
   --radius: 14px;
   --radius-sm: 8px;
-  --nav-h: 64px;
+  --nav-h: 58px;
+  /* safe-area от Telegram WebApp + iOS home indicator */
+  --safe-top: max(env(safe-area-inset-top, 0px), var(--tg-content-safe-area-inset-top, 0px));
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px), var(--tg-content-safe-area-inset-bottom, 0px));
+  --nav-total: calc(var(--nav-h) + var(--safe-bottom));
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body {
+html {
   height: 100%;
+  background: var(--bg);
+}
+
+body {
+  /* используем высоту от Telegram WebApp SDK; dvh как запасной вариант */
+  height: var(--tg-viewport-stable-height, 100dvh);
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
   font-size: 15px;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
+  overflow: hidden;
 }
 
 #root {
   height: 100%;
   display: flex;
   flex-direction: column;
+  padding-top: var(--safe-top);
 }
 
 /* ── Layout ─────────────────────────────────────────────────────────────── */
 .page {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 16px calc(var(--nav-h) + 16px);
+  padding: 16px 16px calc(var(--nav-total) + 16px);
   -webkit-overflow-scrolling: touch;
 }
 
@@ -79,8 +91,9 @@ html, body {
   bottom: 0;
   left: 0;
   right: 0;
-  height: var(--nav-h);
-  background: rgba(13, 13, 20, 0.95);
+  height: var(--nav-total);
+  padding-bottom: var(--safe-bottom);
+  background: rgba(13, 13, 20, 0.97);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-top: 1px solid var(--purple-border);
@@ -284,12 +297,6 @@ input[type=range]::-moz-range-thumb {
   width: 100%;
   height: 40px;
   accent-color: var(--purple);
-}
-
-.media-sticker {
-  max-width: 140px;
-  max-height: 140px;
-  display: block;
 }
 
 .media-meta {
