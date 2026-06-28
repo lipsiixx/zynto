@@ -19,9 +19,9 @@
   --radius: 14px;
   --radius-sm: 8px;
   --nav-h: 58px;
-  /* safe-area от Telegram WebApp + iOS home indicator */
-  --safe-top: max(env(safe-area-inset-top, 0px), var(--tg-content-safe-area-inset-top, 0px));
-  --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px), var(--tg-content-safe-area-inset-bottom, 0px));
+  /* JS ставит --tg-inset-top/bottom из safeAreaInset + contentSafeAreaInset */
+  --safe-top: max(env(safe-area-inset-top, 0px), var(--tg-inset-top, 0px));
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--tg-inset-bottom, 0px));
   --nav-total: calc(var(--nav-h) + var(--safe-bottom));
 }
 

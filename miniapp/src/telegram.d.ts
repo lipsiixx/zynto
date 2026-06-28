@@ -7,6 +7,13 @@ interface TelegramWebAppUser {
   photo_url?: string
 }
 
+interface SafeAreaInset {
+  top: number
+  bottom: number
+  left: number
+  right: number
+}
+
 interface TelegramWebApp {
   initData: string
   initDataUnsafe: {
@@ -27,9 +34,13 @@ interface TelegramWebApp {
   isExpanded: boolean
   viewportHeight: number
   viewportStableHeight: number
+  safeAreaInset?: SafeAreaInset
+  contentSafeAreaInset?: SafeAreaInset
   ready(): void
   expand(): void
   close(): void
+  onEvent(eventType: string, handler: () => void): void
+  offEvent(eventType: string, handler: () => void): void
   BackButton: {
     isVisible: boolean
     show(): void

@@ -53,6 +53,21 @@ export default function App() {
     if (tg) {
       tg.ready()
       tg.expand()
+
+      const applyInsets = () => {
+        const sa = tg.safeAreaInset
+        const csa = tg.contentSafeAreaInset
+        const top = (sa?.top ?? 0) + (csa?.top ?? 0)
+        const bottom = (sa?.bottom ?? 0) + (csa?.bottom ?? 0)
+        const root = document.documentElement
+        // только если Telegram вернул реальные значения (>0), иначе CSS env() справится сам
+        if (top > 0) root.style.setProperty('--tg-inset-top', top + 'px')
+        if (bottom > 0) root.style.setProperty('--tg-inset-bottom', bottom + 'px')
+      }
+
+      applyInsets()
+      tg.onEvent('safeAreaChanged', applyInsets)
+      tg.onEvent('contentSafeAreaChanged', applyInsets)
     }
 
     async function init() {
