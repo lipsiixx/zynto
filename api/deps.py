@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import AsyncGenerator
 
-from fastapi import Depends, HTTPException, Query, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,11 +18,15 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
-def require_auth(
+async def require_auth(
+    request: Request,
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    token: str | None = Query(default=None),
 ) -> None:
-    tok = (creds.credentials if creds else None) or token
+    # Токен из заголовка Authorization: Bearer <tok>
+    tok = creds.credentials if creds else None
+    # Запасной вариант: ?token=<tok> в строке запроса (нужен для <img src> и <audio src>)
+    if not tok:
+        tok = request.query_params.get("token")
     if not tok or not verify_token(tok):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
