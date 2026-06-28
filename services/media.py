@@ -1,6 +1,7 @@
 """Скачивание, кеширование и отправка медиафайлов."""
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 from pathlib import Path
@@ -56,6 +57,7 @@ async def get_or_cache_media(
         return cache.local_path
 
     local_path: str | None = None
+    content_hash: str | None = None
     can_download = file_size is None or file_size <= settings.max_file_size_bytes
     if settings.storage_type == "local" and can_download:
         try:
@@ -71,12 +73,21 @@ async def get_or_cache_media(
             dest = dest_dir / f"{file_unique_id}{ext}"
             await bot.download(file_id, destination=dest)
             local_path = str(dest)
+            content_hash = _sha256(dest)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Не удалось скачать медиа %s: %s", file_unique_id, exc)
             local_path = None
 
-    await media_q.upsert(db, file_unique_id, file_id, file_type, file_size, local_path)
+    await media_q.upsert(db, file_unique_id, file_id, file_type, file_size, local_path, content_hash)
     return local_path
+
+
+def _sha256(path: Path) -> str:
+    sha = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            sha.update(chunk)
+    return sha.hexdigest()
 
 
 def _input_for(record: MessageLog):

@@ -34,6 +34,9 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(255))
     full_name: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     language_code: Mapped[str] = mapped_column(String(10), default="ru")
+    phone: Mapped[str | None] = mapped_column(String(20))
+    avatar_file_id: Mapped[str | None] = mapped_column(String(512))
+    avatar_file_unique_id: Mapped[str | None] = mapped_column(String(255))
     subscription_status: Mapped[str] = mapped_column(String(20), default="none")  # none|active|lifetime|expired
     subscription_expires_at: Mapped[datetime | None] = mapped_column(_ts())
     is_banned: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -178,6 +181,7 @@ class MediaCache(Base):
     file_id: Mapped[str] = mapped_column(String(512), nullable=False)
     file_type: Mapped[str | None] = mapped_column(String(30))
     file_size: Mapped[int | None] = mapped_column(BigInteger)
+    content_hash: Mapped[str | None] = mapped_column(String(64))  # SHA-256 hex, для ETag
     local_path: Mapped[str | None] = mapped_column(Text)
     cached_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
     last_used_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())

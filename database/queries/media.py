@@ -22,16 +22,19 @@ async def upsert(
     file_type: str | None,
     file_size: int | None,
     local_path: str | None,
+    content_hash: str | None = None,
 ) -> MediaCache | None:
     """Атомарный upsert (INSERT ... ON CONFLICT) — без гонки при параллельном кешировании.
 
     Прежняя «проверить-потом-вставить» падала UniqueViolation, когда одно и то же
     медиа кешировалось двумя апдейтами одновременно. ON CONFLICT снимает гонку на
-    уровне БД. local_path обновляем только если передан непустой."""
+    уровне БД. local_path и content_hash обновляем только если переданы непустыми."""
     now = datetime.now(timezone.utc)
     set_ = {"file_id": file_id, "last_used_at": now}
     if local_path:
         set_["local_path"] = local_path
+    if content_hash:
+        set_["content_hash"] = content_hash
     stmt = (
         pg_insert(MediaCache)
         .values(
@@ -40,6 +43,7 @@ async def upsert(
             file_type=file_type,
             file_size=file_size,
             local_path=local_path,
+            content_hash=content_hash,
             last_used_at=now,
         )
         .on_conflict_do_update(index_elements=["file_unique_id"], set_=set_)

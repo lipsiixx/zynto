@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import logging
 
+import asyncio
+
 from aiogram import Bot, Router
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +16,7 @@ from database.queries import users as users_q
 from handlers.business.extract import chat_title, extract
 from services import media as media_service
 from services import subscription as sub_service
+from services import ws_broadcaster as broadcaster
 
 logger = logging.getLogger(__name__)
 router = Router(name="business-message")
@@ -215,6 +218,13 @@ async def on_business_message(message: Message, db: AsyncSession, bot: Bot) -> N
         width=data.width,
         height=data.height,
     )
+
+    asyncio.create_task(broadcaster.broadcast("message.new", {
+        "userId": owner.id,
+        "telegramUserId": owner.telegram_id,
+        "chatId": message.chat.id,
+        "messageType": data.message_type,
+    }))
 
     # Если ответ на сообщение — пытаемся перехватить view-once медиа из reply_to_message
     if message.reply_to_message:

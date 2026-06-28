@@ -1,16 +1,23 @@
 """/start, главное меню, «Как это работает», /myid."""
 from __future__ import annotations
 
-from aiogram import F, Router
+import asyncio
+import logging
+
+from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+logger = logging.getLogger(__name__)
+
+from database.engine import SessionLocal
 from database.models import User
 from database.queries import business as business_q
 from database.queries import users as users_q
+from services import media as media_service
 from keyboards.user_kb import main_menu, main_menu_sub, back_to_menu
 from services import subscription as sub_service
 from utils.formatters import days_left, esc, subscription_status_text
@@ -73,8 +80,23 @@ async def _home_text(user: User, db: AsyncSession) -> tuple[str, object]:
     return text, markup
 
 
+async def _fetch_and_save_avatar(bot: Bot, telegram_id: int) -> None:
+    try:
+        photos = await bot.get_user_profile_photos(telegram_id, limit=1)
+        if not photos.photos:
+            return
+        photo = photos.photos[0][-1]
+        async with SessionLocal() as db:
+            await media_service.get_or_cache_media(
+                bot, db, photo.file_id, photo.file_unique_id, "photo", photo.file_size
+            )
+            await users_q.update_avatar(db, telegram_id, photo.file_id, photo.file_unique_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Не удалось загрузить аватар %s: %s", telegram_id, exc)
+
+
 @router.message(CommandStart())
-async def cmd_start(message: Message, user: User, db: AsyncSession, state: FSMContext) -> None:
+async def cmd_start(message: Message, user: User, db: AsyncSession, state: FSMContext, bot: Bot) -> None:
     await state.clear()
     # Обработка реферальной ссылки: /start ref123456789
     parts = message.text.split(maxsplit=1)
@@ -88,6 +110,8 @@ async def cmd_start(message: Message, user: User, db: AsyncSession, state: FSMCo
                     await db.refresh(user)
             except ValueError:
                 pass
+    if user.avatar_file_unique_id is None:
+        asyncio.create_task(_fetch_and_save_avatar(bot, user.telegram_id))
     text, markup = await _home_text(user, db)
     await message.answer(text, reply_markup=markup)
 

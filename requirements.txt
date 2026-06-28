@@ -8,3 +8,6 @@ aiofiles>=24.1
 python-dotenv>=1.0
 psutil>=6.0
 aiohttp_socks>=0.9
+fastapi>=0.115
+uvicorn[standard]>=0.32
+PyJWT>=2.8

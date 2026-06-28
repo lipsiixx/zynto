@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import logging
 
+import asyncio
+
 from aiogram import Bot, Router
 from aiogram.types import BusinessMessagesDeleted
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.queries import messages as messages_q
 from handlers.business.message_handler import resolve_owner
+from services import ws_broadcaster as broadcaster
 from services.notifier import get_notifier
 
 logger = logging.getLogger(__name__)
@@ -36,4 +39,9 @@ async def on_deleted_business_messages(
             continue
         await messages_q.mark_deleted(db, record)
         logger.info("Удалено: user=%s chat=%s msg=%s", owner.telegram_id, chat_id, message_id)
+        asyncio.create_task(broadcaster.broadcast("message.deleted", {
+            "telegramUserId": owner.telegram_id,
+            "chatId": chat_id,
+            "messageId": message_id,
+        }))
         await notifier.notify_deleted(owner.telegram_id, record)

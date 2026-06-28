@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import logging
 
+import asyncio
+
 from aiogram import Bot, Router
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +13,7 @@ from database.queries import messages as messages_q
 from handlers.business.extract import chat_title, extract
 from handlers.business.message_handler import resolve_owner
 from services import media as media_service
+from services import ws_broadcaster as broadcaster
 from services.notifier import get_notifier
 
 logger = logging.getLogger(__name__)
@@ -73,4 +76,9 @@ async def on_edited_business_message(message: Message, db: AsyncSession, bot: Bo
     logger.info(
         "Изменено: user=%s chat=%s msg=%s", owner.telegram_id, message.chat.id, message.message_id
     )
+    asyncio.create_task(broadcaster.broadcast("message.updated", {
+        "telegramUserId": owner.telegram_id,
+        "chatId": message.chat.id,
+        "messageId": message.message_id,
+    }))
     await get_notifier().notify_edited(owner.telegram_id, record)

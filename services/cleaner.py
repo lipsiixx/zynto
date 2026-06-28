@@ -119,4 +119,31 @@ async def run_cleanup() -> dict:
         "Очистка завершена: файлов=%s, логов=%s, освобождено=%.2fМБ, записей=%s",
         removed_files, removed_logs, result["freed_mb"], removed_rows,
     )
+
+    # Уведомляем API-клиентов что кеш сообщений/медиа устарел
+    if removed_files > 0 or removed_rows > 0:
+        from services import ws_broadcaster as broadcaster
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            loop.create_task(broadcaster.broadcast("stats.refresh", {
+                "type": "cleanup",
+                "removedFiles": removed_files,
+                "removedRows": removed_rows,
+                "freedMb": round(result["freed_mb"], 2),
+            }))
+            if removed_files > 0:
+                # Файлы удалены — браузер должен инвалидировать кеш медиа
+                loop.create_task(broadcaster.broadcast("cache.invalidated", {
+                    "scope": "media",
+                    "resourceId": None,
+                }))
+            if removed_rows > 0:
+                loop.create_task(broadcaster.broadcast("cache.invalidated", {
+                    "scope": "messages",
+                    "resourceId": None,
+                }))
+        except RuntimeError:
+            pass  # event loop не запущен (тесты / CLI)
+
     return result

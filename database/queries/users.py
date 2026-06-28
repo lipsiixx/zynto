@@ -150,3 +150,48 @@ async def count_active_subscribers(db: AsyncSession) -> int:
         select(func.count(User.id)).where(User.subscription_status.in_(["active", "lifetime"]))
     )
     return int(res.scalar() or 0)
+
+
+async def update_avatar(
+    db: AsyncSession,
+    telegram_id: int,
+    file_id: str,
+    file_unique_id: str,
+) -> None:
+    await db.execute(
+        update(User)
+        .where(User.telegram_id == telegram_id)
+        .values(avatar_file_id=file_id, avatar_file_unique_id=file_unique_id)
+    )
+    await db.commit()
+
+
+async def list_users(
+    db: AsyncSession,
+    q: str | None = None,
+    status: str | None = None,
+    page: int = 1,
+    limit: int = 20,
+) -> tuple[list[User], int]:
+    from sqlalchemy import or_, cast, Text
+    base = select(User)
+    if q:
+        base = base.where(
+            or_(
+                User.full_name.ilike(f"%{q}%"),
+                User.username.ilike(f"%{q}%"),
+                cast(User.telegram_id, Text).like(f"%{q}%"),
+            )
+        )
+    if status:
+        base = base.where(User.subscription_status == status)
+    total = int((await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0)
+    res = await db.execute(
+        base.order_by(User.created_at.desc()).limit(limit).offset((page - 1) * limit)
+    )
+    return list(res.scalars().all()), total
+
+
+async def get_user_by_id(db: AsyncSession, user_id: int) -> User | None:
+    res = await db.execute(select(User).where(User.id == user_id))
+    return res.scalar_one_or_none()

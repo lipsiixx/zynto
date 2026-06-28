@@ -167,6 +167,24 @@ async def select_proxy_session() -> tuple[AiohttpSession | None, str]:
     return None, ""
 
 
+async def start_api_server() -> asyncio.Task:
+    """Запускает FastAPI/uvicorn в фоновой задаче того же event loop."""
+    import uvicorn
+    from api.app import app
+
+    config = uvicorn.Config(
+        app,
+        host=settings.api_host,
+        port=settings.api_port,
+        log_level="warning",
+        access_log=False,
+    )
+    server = uvicorn.Server(config)
+    task = asyncio.create_task(server.serve(), name="api-server")
+    logger.info("REST API запущен на %s:%s", settings.api_host, settings.api_port)
+    return task
+
+
 async def main() -> None:
     setup_logging()
     settings.validate()
@@ -242,12 +260,21 @@ async def main() -> None:
 
     await set_commands(bot)
 
+    api_task: asyncio.Task | None = None
+    if settings.api_enabled:
+        if not settings.api_password:
+            logger.warning("API_ENABLED=true, но API_PASSWORD не задан — API не запущен")
+        else:
+            api_task = await start_api_server()
+
     try:
         me = await bot.get_me()
         logger.info("Бот @%s запущен", me.username)
         await bot.delete_webhook(drop_pending_updates=False)
         await dp.start_polling(bot, allowed_updates=ALLOWED_UPDATES)
     finally:
+        if api_task is not None:
+            api_task.cancel()
         scheduler.shutdown(wait=False)
         if proxy_monitor is not None:
             await proxy_monitor.stop()

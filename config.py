@@ -97,6 +97,13 @@ class Settings:
     # TEST=true — прокси не подключаются (прямое соединение), удобно для локальной разработки.
     test_mode: bool = field(default_factory=lambda: os.getenv("TEST", "false").lower() in ("1", "true", "yes"))
 
+    # REST API для веб-панели администратора
+    api_password: str = field(default_factory=lambda: os.getenv("API_PASSWORD", ""))
+    api_secret: str = field(default_factory=lambda: os.getenv("API_SECRET", "change-me-in-production"))
+    api_host: str = field(default_factory=lambda: os.getenv("API_HOST", "0.0.0.0"))
+    api_port: int = field(default_factory=lambda: _get_int("API_PORT", 8000))
+    api_enabled: bool = field(default_factory=lambda: os.getenv("API_ENABLED", "false").lower() in ("1", "true", "yes"))
+
     @property
     def max_file_size_bytes(self) -> int:
         return self.max_file_size_mb * 1024 * 1024
