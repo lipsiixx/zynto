@@ -77,10 +77,22 @@ async def run_nudge_job(bot: Bot) -> None:
         for user in due_users:
             if nudge_msg is not None:
                 try:
-                    await bot.send_message(
-                        user.telegram_id, nudge_msg.text,
-                        parse_mode="HTML", reply_markup=nudge_kb(),
-                    )
+                    kb = nudge_kb()
+                    if nudge_msg.media_type == "photo":
+                        await bot.send_photo(
+                            user.telegram_id, nudge_msg.media_file_id,
+                            caption=nudge_msg.text, parse_mode="HTML", reply_markup=kb,
+                        )
+                    elif nudge_msg.media_type == "video":
+                        await bot.send_video(
+                            user.telegram_id, nudge_msg.media_file_id,
+                            caption=nudge_msg.text, parse_mode="HTML", reply_markup=kb,
+                        )
+                    else:
+                        await bot.send_message(
+                            user.telegram_id, nudge_msg.text,
+                            parse_mode="HTML", reply_markup=kb,
+                        )
                     user.nudge_sent_at = now_utc
                     logger.info("Nudge отправлен: user=%s", user.telegram_id)
                 except TelegramForbiddenError:

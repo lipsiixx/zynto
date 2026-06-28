@@ -144,3 +144,8 @@ async def cb_menu(call: CallbackQuery, user: User, db: AsyncSession, state: FSMC
 async def cb_how(call: CallbackQuery) -> None:
     await call.message.edit_text(HOW_IT_WORKS, reply_markup=back_to_menu())
     await call.answer()
+
+
+@router.callback_query(F.data == "miniapp_unavailable")
+async def cb_miniapp_unavailable(call: CallbackQuery) -> None:
+    await call.answer("⚙️ Мини-апп пока не настроен. Используй команды бота.", show_alert=True)

@@ -104,6 +104,9 @@ class Settings:
     api_port: int = field(default_factory=lambda: _get_int("API_PORT", 8000))
     api_enabled: bool = field(default_factory=lambda: os.getenv("API_ENABLED", "false").lower() in ("1", "true", "yes"))
 
+    # URL мини-апп для кнопки WebApp в боте (например https://yourdomain.com/miniapp)
+    miniapp_url: str = field(default_factory=lambda: os.getenv("MINIAPP_URL", ""))
+
     @property
     def max_file_size_bytes(self) -> int:
         return self.max_file_size_mb * 1024 * 1024

@@ -26,19 +26,47 @@ async def get_random_active_nudge(db: AsyncSession) -> NudgeMessage | None:
     return res.scalars().first()
 
 
-async def create_nudge_message(db: AsyncSession, text: str) -> NudgeMessage:
-    msg = NudgeMessage(text=text)
+async def create_nudge_message(
+    db: AsyncSession,
+    text: str | None = None,
+    media_file_id: str | None = None,
+    media_type: str | None = None,
+) -> NudgeMessage:
+    msg = NudgeMessage(text=text, media_file_id=media_file_id, media_type=media_type)
     db.add(msg)
     await db.commit()
     await db.refresh(msg)
     return msg
 
 
-async def update_nudge_message(db: AsyncSession, msg_id: int, text: str) -> NudgeMessage | None:
+async def update_nudge_message(
+    db: AsyncSession,
+    msg_id: int,
+    text: str | None = None,
+    media_file_id: str | None = None,
+    media_type: str | None = None,
+    clear_media: bool = False,
+) -> NudgeMessage | None:
     msg = await get_nudge_message(db, msg_id)
     if msg is None:
         return None
     msg.text = text
+    if clear_media:
+        msg.media_file_id = None
+        msg.media_type = None
+    else:
+        msg.media_file_id = media_file_id
+        msg.media_type = media_type
+    await db.commit()
+    return msg
+
+
+async def clear_nudge_media(db: AsyncSession, msg_id: int) -> NudgeMessage | None:
+    msg = await get_nudge_message(db, msg_id)
+    if msg is None:
+        return None
+    msg.media_file_id = None
+    msg.media_type = None
     await db.commit()
     return msg
 

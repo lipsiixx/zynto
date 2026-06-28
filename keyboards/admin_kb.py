@@ -217,20 +217,24 @@ def nudge_main_kb(is_enabled: bool) -> InlineKeyboardMarkup:
 def nudge_msgs_kb(messages) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     for m in messages:
-        icon = "🟢" if m.is_active else "🔴"
-        preview = m.text[:35].replace("\n", " ") + ("…" if len(m.text) > 35 else "")
-        kb.button(text=f"{icon} {preview}", callback_data=f"a:nudge_view:{m.id}")
+        active_icon = "🟢" if m.is_active else "🔴"
+        media_icon = " 📷" if m.media_type == "photo" else (" 🎥" if m.media_type == "video" else "")
+        raw = m.text or "(без текста)"
+        preview = raw[:35].replace("\n", " ") + ("…" if len(raw) > 35 else "")
+        kb.button(text=f"{active_icon}{media_icon} {preview}", callback_data=f"a:nudge_view:{m.id}")
     kb.adjust(1)
-    kb.row(InlineKeyboardButton(text="➕ Добавить текст", callback_data="a:nudge_add"))
+    kb.row(InlineKeyboardButton(text="➕ Добавить сообщение", callback_data="a:nudge_add"))
     kb.row(InlineKeyboardButton(text="⬅️ Настройки", callback_data="a:nudge"))
     return kb.as_markup()
 
 
-def nudge_msg_kb(msg_id: int, is_active: bool) -> InlineKeyboardMarkup:
+def nudge_msg_kb(msg_id: int, is_active: bool, has_media: bool = False) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     toggle = "🔴 Деактивировать" if is_active else "🟢 Активировать"
     kb.button(text=toggle, callback_data=f"a:nudge_mtoggle:{msg_id}")
     kb.button(text="✏️ Редактировать", callback_data=f"a:nudge_edit:{msg_id}")
+    if has_media:
+        kb.button(text="🗑 Удалить медиа", callback_data=f"a:nudge_clearmedia:{msg_id}")
     kb.button(text="🗑 Удалить", callback_data=f"a:nudge_del:{msg_id}")
     kb.button(text="⬅️ К списку", callback_data="a:nudge_msgs")
     kb.adjust(1)

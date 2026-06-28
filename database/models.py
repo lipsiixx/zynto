@@ -191,9 +191,25 @@ class NudgeMessage(Base):
     __tablename__ = "nudge_messages"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    text: Mapped[str] = mapped_column(Text, nullable=False)
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    media_file_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    media_type: Mapped[str | None] = mapped_column(String(10), nullable=True)  # "photo" | "video"
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
+
+
+class ContactTrust(Base):
+    __tablename__ = "contact_trust"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    manual_score: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 0-100, user override
+    updated_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("ix_contact_trust_user_chat", "user_id", "chat_id", unique=True),
+    )
 
 
 class BotSetting(Base):

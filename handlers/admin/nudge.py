@@ -7,6 +7,7 @@ from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.queries import nudge as nudge_q
@@ -16,6 +17,17 @@ from states.admin_states import NudgeStates
 
 logger = logging.getLogger(__name__)
 router = Router(name="admin-nudge")
+
+
+def _extract_media(message: Message) -> tuple[str | None, str | None, str | None]:
+    """Возвращает (text, media_file_id, media_type) из сообщения."""
+    if message.photo:
+        return message.caption, message.photo[-1].file_id, "photo"
+    if message.video:
+        return message.caption, message.video.file_id, "video"
+    if message.text:
+        return message.text, None, None
+    return None, None, None
 
 
 async def _settings_text(db: AsyncSession) -> str:
@@ -33,6 +45,17 @@ async def _settings_text(db: AsyncSession) -> str:
         f"Текстов: <b>{len(messages)}</b> (активных: {active_count})\n\n"
         f"Отправляются в случайное время с 10:00 до 21:00 МСК."
     )
+
+
+def _msg_view_text(msg) -> str:
+    status = "🟢 Активно" if msg.is_active else "🔴 Неактивно"
+    media_line = ""
+    if msg.media_type == "photo":
+        media_line = "\n📷 <b>Прикреплено фото</b>"
+    elif msg.media_type == "video":
+        media_line = "\n🎥 <b>Прикреплено видео</b>"
+    text_line = f"\n\n{msg.text}" if msg.text else ""
+    return f"💬 <b>Сообщение #{msg.id}</b> [{status}]{media_line}{text_line}"
 
 
 # ─── Главная страница ──────────────────────────────────────────────────────
@@ -68,7 +91,6 @@ async def cb_nudge_toggle(call: CallbackQuery, db: AsyncSession) -> None:
 
 @router.callback_query(F.data == "a:nudge_set_interval")
 async def cb_nudge_set_interval(call: CallbackQuery, state: FSMContext) -> None:
-    interval = 1  # default shown in prompt
     await state.set_state(NudgeStates.waiting_interval)
     await call.message.answer(
         "⏱ <b>Периодичность отправки (в днях)</b>\n\n"
@@ -127,16 +149,16 @@ async def on_nudge_grace(message: Message, db: AsyncSession, state: FSMContext) 
     )
 
 
-# ─── Список текстов ───────────────────────────────────────────────────────
+# ─── Список сообщений ─────────────────────────────────────────────────────
 
 @router.callback_query(F.data == "a:nudge_msgs")
 async def cb_nudge_msgs(call: CallbackQuery, db: AsyncSession, state: FSMContext) -> None:
     await state.clear()
     messages = await nudge_q.list_nudge_messages(db)
     if not messages:
-        text = "📝 <b>Тексты подначиваний</b>\n\nСписок пуст. Добавь первый текст."
+        text = "📝 <b>Подначивающие сообщения</b>\n\nСписок пуст. Добавь первое сообщение."
     else:
-        text = f"📝 <b>Тексты подначиваний</b> ({len(messages)} шт.)\n\nВыбери текст для управления:"
+        text = f"📝 <b>Подначивающие сообщения</b> ({len(messages)} шт.)\n\nВыбери для управления:"
     try:
         await call.message.edit_text(text, reply_markup=nudge_msgs_kb(messages))
     except TelegramBadRequest:
@@ -144,28 +166,33 @@ async def cb_nudge_msgs(call: CallbackQuery, db: AsyncSession, state: FSMContext
     await call.answer()
 
 
-# ─── Добавить текст ───────────────────────────────────────────────────────
+# ─── Добавить сообщение ───────────────────────────────────────────────────
 
 @router.callback_query(F.data == "a:nudge_add")
 async def cb_nudge_add(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(NudgeStates.waiting_text)
     await call.message.answer(
         "✏️ <b>Новое подначивающее сообщение</b>\n\n"
-        "Отправь текст (HTML-разметка поддерживается: <b>жирный</b>, <i>курсив</i>, ссылки).\n\n"
+        "Отправь <b>текст</b>, <b>фото</b> или <b>видео</b> (подпись необязательна).\n"
+        "HTML-разметка поддерживается: <b>жирный</b>, <i>курсив</i>, ссылки.\n\n"
         "/admin — для отмены."
     )
     await call.answer()
 
 
-@router.message(NudgeStates.waiting_text, F.text)
-async def on_nudge_text(message: Message, db: AsyncSession, state: FSMContext) -> None:
-    msg = await nudge_q.create_nudge_message(db, message.text)
+@router.message(NudgeStates.waiting_text)
+async def on_nudge_new_msg(message: Message, db: AsyncSession, state: FSMContext) -> None:
+    text, media_file_id, media_type = _extract_media(message)
+    if text is None and media_file_id is None:
+        await message.answer("❌ Отправь текст, фото или видео.")
+        return
+    msg = await nudge_q.create_nudge_message(db, text=text, media_file_id=media_file_id, media_type=media_type)
     await state.clear()
-    logger.info("Nudge: добавлен текст id=%s admin=%s", msg.id, message.from_user.id)
-    await message.answer("✅ Текст добавлен и активен.", reply_markup=admin_back())
+    logger.info("Nudge: добавлено сообщение id=%s media=%s admin=%s", msg.id, media_type, message.from_user.id)
+    await message.answer("✅ Сообщение добавлено и активно.", reply_markup=admin_back())
 
 
-# ─── Просмотр одного текста ───────────────────────────────────────────────
+# ─── Просмотр одного сообщения ────────────────────────────────────────────
 
 @router.callback_query(F.data.startswith("a:nudge_view:"))
 async def cb_nudge_view(call: CallbackQuery, db: AsyncSession, state: FSMContext) -> None:
@@ -175,12 +202,16 @@ async def cb_nudge_view(call: CallbackQuery, db: AsyncSession, state: FSMContext
     if msg is None:
         await call.answer("Сообщение не найдено", show_alert=True)
         return
-    status = "🟢 Активно" if msg.is_active else "🔴 Неактивно"
-    text = f"💬 <b>Текст #{msg.id}</b> [{status}]\n\n{msg.text}"
+    text = _msg_view_text(msg)
     try:
-        await call.message.edit_text(text, reply_markup=nudge_msg_kb(msg.id, msg.is_active))
+        await call.message.edit_text(text, reply_markup=nudge_msg_kb(msg.id, msg.is_active, bool(msg.media_file_id)))
     except TelegramBadRequest:
         pass
+    # Показываем превью медиа отдельным сообщением
+    if msg.media_type == "photo":
+        await call.message.answer_photo(msg.media_file_id, caption=msg.text or None, parse_mode="HTML")
+    elif msg.media_type == "video":
+        await call.message.answer_video(msg.media_file_id, caption=msg.text or None, parse_mode="HTML")
     await call.answer()
 
 
@@ -193,17 +224,17 @@ async def cb_nudge_mtoggle(call: CallbackQuery, db: AsyncSession) -> None:
     if msg is None:
         await call.answer("Не найдено", show_alert=True)
         return
+    text = _msg_view_text(msg)
     status = "🟢 Активно" if msg.is_active else "🔴 Неактивно"
-    text = f"💬 <b>Текст #{msg.id}</b> [{status}]\n\n{msg.text}"
     try:
-        await call.message.edit_text(text, reply_markup=nudge_msg_kb(msg.id, msg.is_active))
+        await call.message.edit_text(text, reply_markup=nudge_msg_kb(msg.id, msg.is_active, bool(msg.media_file_id)))
     except TelegramBadRequest:
         pass
     await call.answer(status)
     logger.info("Nudge: msg=%s активность → %s admin=%s", msg_id, msg.is_active, call.from_user.id)
 
 
-# ─── Редактировать текст ─────────────────────────────────────────────────
+# ─── Редактировать сообщение ─────────────────────────────────────────────
 
 @router.callback_query(F.data.startswith("a:nudge_edit:"))
 async def cb_nudge_edit(call: CallbackQuery, state: FSMContext) -> None:
@@ -211,27 +242,50 @@ async def cb_nudge_edit(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(NudgeStates.waiting_edit_text)
     await state.update_data(edit_msg_id=msg_id)
     await call.message.answer(
-        f"✏️ <b>Редактирование текста #{msg_id}</b>\n\n"
-        "Отправь новый текст (HTML поддерживается).\n\n"
+        f"✏️ <b>Редактирование сообщения #{msg_id}</b>\n\n"
+        "Отправь новый <b>текст</b>, <b>фото</b> или <b>видео</b>.\n"
+        "Текущее медиа будет заменено; для удаления медиа без замены используй кнопку «🗑 Удалить медиа».\n\n"
         "/admin — для отмены."
     )
     await call.answer()
 
 
-@router.message(NudgeStates.waiting_edit_text, F.text)
-async def on_nudge_edit_text(message: Message, db: AsyncSession, state: FSMContext) -> None:
+@router.message(NudgeStates.waiting_edit_text)
+async def on_nudge_edit_msg(message: Message, db: AsyncSession, state: FSMContext) -> None:
     data = await state.get_data()
     msg_id = data.get("edit_msg_id")
-    msg = await nudge_q.update_nudge_message(db, msg_id, message.text)
+    text, media_file_id, media_type = _extract_media(message)
+    if text is None and media_file_id is None:
+        await message.answer("❌ Отправь текст, фото или видео.")
+        return
+    msg = await nudge_q.update_nudge_message(db, msg_id, text=text, media_file_id=media_file_id, media_type=media_type)
     await state.clear()
     if msg is None:
         await message.answer("❌ Сообщение не найдено.", reply_markup=admin_back())
         return
-    logger.info("Nudge: обновлён текст id=%s admin=%s", msg_id, message.from_user.id)
-    await message.answer("✅ Текст обновлён.", reply_markup=admin_back())
+    logger.info("Nudge: обновлено сообщение id=%s media=%s admin=%s", msg_id, media_type, message.from_user.id)
+    await message.answer("✅ Сообщение обновлено.", reply_markup=admin_back())
 
 
-# ─── Удалить текст ───────────────────────────────────────────────────────
+# ─── Удалить медиа ───────────────────────────────────────────────────────
+
+@router.callback_query(F.data.startswith("a:nudge_clearmedia:"))
+async def cb_nudge_clearmedia(call: CallbackQuery, db: AsyncSession) -> None:
+    msg_id = int(call.data.split(":")[-1])
+    msg = await nudge_q.clear_nudge_media(db, msg_id)
+    if msg is None:
+        await call.answer("Не найдено", show_alert=True)
+        return
+    text = _msg_view_text(msg)
+    try:
+        await call.message.edit_text(text, reply_markup=nudge_msg_kb(msg.id, msg.is_active, False))
+    except TelegramBadRequest:
+        pass
+    await call.answer("🗑 Медиа удалено")
+    logger.info("Nudge: очищено медиа msg=%s admin=%s", msg_id, call.from_user.id)
+
+
+# ─── Удалить сообщение ───────────────────────────────────────────────────
 
 @router.callback_query(F.data.startswith("a:nudge_del:"))
 async def cb_nudge_del(call: CallbackQuery, db: AsyncSession) -> None:
@@ -242,13 +296,13 @@ async def cb_nudge_del(call: CallbackQuery, db: AsyncSession) -> None:
         return
     messages = await nudge_q.list_nudge_messages(db)
     text = (
-        f"📝 <b>Тексты подначиваний</b> ({len(messages)} шт.)\n\nВыбери текст для управления:"
+        f"📝 <b>Подначивающие сообщения</b> ({len(messages)} шт.)\n\nВыбери для управления:"
         if messages else
-        "📝 <b>Тексты подначиваний</b>\n\nСписок пуст. Добавь первый текст."
+        "📝 <b>Подначивающие сообщения</b>\n\nСписок пуст. Добавь первое сообщение."
     )
     try:
         await call.message.edit_text(text, reply_markup=nudge_msgs_kb(messages))
     except TelegramBadRequest:
         pass
     await call.answer("🗑 Удалено")
-    logger.info("Nudge: удалён текст id=%s admin=%s", msg_id, call.from_user.id)
+    logger.info("Nudge: удалено сообщение id=%s admin=%s", msg_id, call.from_user.id)

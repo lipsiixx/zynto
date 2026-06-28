@@ -11,3 +11,4 @@ media/
 .DS_Store
 media-backup/
 proxies.txt
+miniapp/node_modules/

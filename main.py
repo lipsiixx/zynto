@@ -167,10 +167,12 @@ async def select_proxy_session() -> tuple[AiohttpSession | None, str]:
     return None, ""
 
 
-async def start_api_server() -> asyncio.Task:
+async def start_api_server(bot: Bot) -> asyncio.Task:
     """Запускает FastAPI/uvicorn в фоновой задаче того же event loop."""
     import uvicorn
     from api.app import app
+
+    app.state.bot = bot
 
     config = uvicorn.Config(
         app,
@@ -265,7 +267,7 @@ async def main() -> None:
         if not settings.api_password:
             logger.warning("API_ENABLED=true, но API_PASSWORD не задан — API не запущен")
         else:
-            api_task = await start_api_server()
+            api_task = await start_api_server(bot)
 
     try:
         me = await bot.get_me()
