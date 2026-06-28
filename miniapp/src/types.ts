@@ -43,6 +43,11 @@ export interface MessageEvent {
   text_content: string | null
   original_text: string | null
   file_id: string | null
+  file_unique_id: string | null
+  mime_type: string | null
+  duration_seconds: number | null
+  width: number | null
+  height: number | null
   received_at: string | null
   deleted_at: string | null
   edited_at: string | null

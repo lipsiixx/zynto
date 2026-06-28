@@ -2,18 +2,22 @@
 from __future__ import annotations
 
 import logging
+import mimetypes
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional
 
 from aiogram import Bot
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import FileResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth import create_user_token, verify_user_token, verify_webapp_init_data
 from api.deps import get_db
-from database.models import User
+from database.models import MediaCache, MessageLog, User
 from database.queries import promo_codes as promo_q
 from database.queries import tariffs as tariffs_q
 from database.queries import users as users_q
@@ -177,6 +181,11 @@ async def webapp_contact_events(
             "text_content": e.text_content,
             "original_text": e.original_text,
             "file_id": e.file_id,
+            "file_unique_id": e.file_unique_id,
+            "mime_type": e.mime_type,
+            "duration_seconds": e.duration_seconds,
+            "width": e.width,
+            "height": e.height,
             "received_at": e.received_at.isoformat() if e.received_at else None,
             "deleted_at": e.deleted_at.isoformat() if e.deleted_at else None,
             "edited_at": e.edited_at.isoformat() if e.edited_at else None,
@@ -314,3 +323,62 @@ async def webapp_activate(
 
     expires_at = access_expires.isoformat() if access_expires else None
     return {"type": "access", "message": "Подписка активирована!", "expires_at": expires_at}
+
+
+_MEDIA_MIME: dict[str, str] = {
+    "photo": "image/jpeg",
+    "video": "video/mp4",
+    "audio": "audio/mpeg",
+    "voice": "audio/ogg",
+    "video_note": "video/mp4",
+    "sticker": "image/webp",
+    "animation": "video/mp4",
+    "document": "application/octet-stream",
+}
+
+
+@router.get("/media/{file_unique_id}")
+async def webapp_media(
+    request: Request,
+    file_unique_id: str,
+    telegram_id: int = Depends(_require_webapp_auth),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Отдаёт медиафайл пользователю — только его собственные сообщения."""
+    # Проверяем что файл принадлежит этому пользователю
+    owner_check = await db.execute(
+        select(MessageLog.id).where(
+            MessageLog.file_unique_id == file_unique_id,
+            MessageLog.user_id == telegram_id,
+        ).limit(1)
+    )
+    if owner_check.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="not_found")
+
+    cache_row = await db.execute(
+        select(MediaCache).where(MediaCache.file_unique_id == file_unique_id)
+    )
+    cache = cache_row.scalar_one_or_none()
+
+    if cache is None or not cache.local_path:
+        raise HTTPException(status_code=404, detail="not_cached")
+
+    path = Path(cache.local_path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="file_deleted")
+
+    etag = cache.content_hash or file_unique_id
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304)
+
+    mime = mimetypes.guess_type(path.name)[0] or _MEDIA_MIME.get(cache.file_type or "", "application/octet-stream")
+
+    return FileResponse(
+        path=str(path),
+        media_type=mime,
+        headers={
+            "ETag": etag,
+            "Cache-Control": "public, max-age=86400",
+            "Accept-Ranges": "bytes",
+        },
+    )

@@ -247,6 +247,64 @@ input[type=range]::-moz-range-thumb {
 .msg-text { font-size: 14px; line-height: 1.5; word-break: break-word; }
 .msg-original { font-size: 12px; color: var(--text3); margin-top: 4px; font-style: italic; }
 
+/* ── Media blocks ────────────────────────────────────────────────────────── */
+.media-block {
+  margin: 8px 0 4px;
+}
+
+.media-img {
+  max-width: 100%;
+  max-height: 220px;
+  width: auto;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  object-fit: cover;
+  display: block;
+  transition: max-height 0.2s;
+}
+.media-img.media-img-full {
+  max-height: none;
+}
+
+.media-video {
+  width: 100%;
+  max-height: 260px;
+  border-radius: var(--radius-sm);
+  background: #000;
+  display: block;
+}
+.media-video-circle {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.media-audio {
+  width: 100%;
+  height: 40px;
+  accent-color: var(--purple);
+}
+
+.media-sticker {
+  max-width: 140px;
+  max-height: 140px;
+  display: block;
+}
+
+.media-meta {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 3px;
+}
+
+.media-unavailable {
+  font-size: 12px;
+  color: var(--text3);
+  padding: 6px 0;
+  font-style: italic;
+}
+
 /* ── Stat chart (bars) ───────────────────────────────────────────────────── */
 .chart-wrap {
   display: flex;

@@ -91,3 +91,8 @@ export async function buyTariff(tariffId: number): Promise<{ message: string }> 
 export async function activateCode(code: string): Promise<{ type: string; message: string }> {
   return req('POST', '/activate', { code })
 }
+
+export function getMediaUrl(fileUniqueId: string): string {
+  const token = _token || localStorage.getItem('zynto_token') || ''
+  return `/v1/webapp/media/${encodeURIComponent(fileUniqueId)}?token=${encodeURIComponent(token)}`
+}
