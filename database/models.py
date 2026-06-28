@@ -212,6 +212,25 @@ class ContactTrust(Base):
     )
 
 
+class MutualRating(Base):
+    __tablename__ = "mutual_rating"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    requester_id: Mapped[int] = mapped_column(BigInteger, nullable=False)   # кто отправил запрос
+    target_id: Mapped[int] = mapped_column(BigInteger, nullable=False)      # кому отправили
+    status: Mapped[str] = mapped_column(String(20), default="pending")      # pending|active|declined|cancelled
+    requester_score: Mapped[int | None] = mapped_column(Integer)            # оценка от инициатора (0-100)
+    target_score: Mapped[int | None] = mapped_column(Integer)               # оценка от получателя (0-100)
+    mutual_score: Mapped[int | None] = mapped_column(Integer)               # среднее (вычисляется при активации)
+    created_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("ix_mutual_rating_pair", "requester_id", "target_id", unique=True),
+        Index("ix_mutual_rating_target", "target_id"),
+    )
+
+
 class BotSetting(Base):
     __tablename__ = "bot_settings"
 

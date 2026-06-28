@@ -18,7 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.auth import create_user_token, verify_user_token, verify_webapp_init_data
 from api.deps import get_db
 from config import BASE_DIR
-from database.models import MediaCache, MessageLog, User
+from database.models import MediaCache, MessageLog, MutualRating, User
+from database.queries import business as biz_q
+from database.queries import mutual_rating as mr_q
 from database.queries import promo_codes as promo_q
 from database.queries import settings as settings_q
 from database.queries import tariffs as tariffs_q
@@ -71,6 +73,14 @@ class TrustSetRequest(BaseModel):
 
 class ActivateRequest(BaseModel):
     code: str
+
+
+class MRRequestBody(BaseModel):
+    my_score: int  # 0-100, оценка инициатора
+
+
+class MRRespondBody(BaseModel):
+    score: int     # 0-100
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────
@@ -325,6 +335,210 @@ async def webapp_activate(
 
     expires_at = access_expires.isoformat() if access_expires else None
     return {"type": "access", "message": "Подписка активирована!", "expires_at": expires_at}
+
+
+# ── Mutual Rating helpers ─────────────────────────────────────────────────
+
+def _mr_fmt(row: MutualRating, my_id: int) -> dict:
+    direction = "outgoing" if row.requester_id == my_id else "incoming"
+    return {
+        "id": row.id,
+        "status": row.status,
+        "direction": direction,
+        "requester_id": row.requester_id,
+        "target_id": row.target_id,
+        "requester_score": row.requester_score,
+        "target_score": row.target_score,
+        "mutual_score": row.mutual_score,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+    }
+
+
+async def _mr_notify(bot, telegram_id: int, text: str, miniapp_url: str | None = None) -> None:
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+    try:
+        kb = None
+        if miniapp_url:
+            kb = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="📱 Открыть", web_app=WebAppInfo(url=miniapp_url))
+            ]])
+        await bot.send_message(telegram_id, text, reply_markup=kb)
+    except Exception:
+        pass
+
+
+# ── Mutual Rating endpoints ───────────────────────────────────────────────
+
+@router.get("/mutual-rating/pending")
+async def webapp_mr_pending(
+    telegram_id: int = Depends(_require_webapp_auth),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    rows = await mr_q.get_pending_incoming(db, telegram_id)
+    result = []
+    for row in rows:
+        user = await users_q.get_user(db, row.requester_id)
+        result.append({
+            **_mr_fmt(row, telegram_id),
+            "requester_name": user.full_name if user else str(row.requester_id),
+        })
+    return {"data": result, "total": len(result)}
+
+
+@router.get("/contacts/{chat_id}/mutual-rating")
+async def webapp_mr_get(
+    chat_id: int,
+    telegram_id: int = Depends(_require_webapp_auth),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    row = await mr_q.get_for_pair(db, telegram_id, chat_id)
+    if row is None:
+        # Проверяем: есть ли контакт в боте с подключением
+        target_user = await users_q.get_user(db, chat_id)
+        target_conn = await biz_q.get_active_for_user(db, chat_id) if target_user else None
+        return {
+            "status": "none",
+            "target_in_bot": target_user is not None,
+            "target_connected": target_conn is not None,
+        }
+    return _mr_fmt(row, telegram_id)
+
+
+@router.post("/contacts/{chat_id}/mutual-rating")
+async def webapp_mr_request(
+    chat_id: int,
+    body: MRRequestBody,
+    request: Request,
+    telegram_id: int = Depends(_require_webapp_auth),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    if not 0 <= body.my_score <= 100:
+        raise HTTPException(422, "score_out_of_range")
+
+    target_user = await users_q.get_user(db, chat_id)
+    if target_user is None:
+        raise HTTPException(404, "target_not_in_bot")
+    if not await biz_q.get_active_for_user(db, chat_id):
+        raise HTTPException(409, "target_not_connected")
+
+    existing = await mr_q.get_for_pair(db, telegram_id, chat_id)
+    if existing and existing.status in ("pending", "active"):
+        raise HTTPException(409, "already_exists")
+
+    # Если у нас уже есть declined/cancelled — пересоздаём
+    if existing:
+        from sqlalchemy import delete
+        await db.execute(delete(MutualRating).where(MutualRating.id == existing.id))
+        await db.commit()
+
+    row = await mr_q.create_request(db, telegram_id, chat_id, body.my_score)
+
+    me = await users_q.get_user(db, telegram_id)
+    my_name = (me.full_name or str(telegram_id)) if me else str(telegram_id)
+
+    bot = _get_bot(request)
+    if bot:
+        from config import settings as cfg
+        url = f"{cfg.miniapp_url}#/contacts/{telegram_id}" if cfg.miniapp_url else None
+        await _mr_notify(
+            bot, chat_id,
+            f"🤝 <b>{my_name}</b> предлагает открыть <b>Взаимный рейтинг</b>.\n\n"
+            f"Выставь свою оценку общению с ним в мини-апп — и вы оба увидите средний балл.",
+            url,
+        )
+
+    return _mr_fmt(row, telegram_id)
+
+
+@router.post("/contacts/{chat_id}/mutual-rating/accept")
+async def webapp_mr_accept(
+    chat_id: int,
+    body: MRRespondBody,
+    request: Request,
+    telegram_id: int = Depends(_require_webapp_auth),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    if not 0 <= body.score <= 100:
+        raise HTTPException(422, "score_out_of_range")
+
+    row = await mr_q.get_for_pair(db, telegram_id, chat_id)
+    if row is None or row.status != "pending":
+        raise HTTPException(404, "not_found_or_not_pending")
+    if row.target_id != telegram_id:
+        raise HTTPException(403, "not_target")
+
+    row = await mr_q.accept(db, row, body.score)
+
+    me = await users_q.get_user(db, telegram_id)
+    my_name = (me.full_name or str(telegram_id)) if me else str(telegram_id)
+
+    bot = _get_bot(request)
+    if bot:
+        from config import settings as cfg
+        url = f"{cfg.miniapp_url}#/contacts/{telegram_id}" if cfg.miniapp_url else None
+        await _mr_notify(
+            bot, row.requester_id,
+            f"✅ <b>{my_name}</b> принял(а) твой запрос на <b>Взаимный рейтинг</b>!\n\n"
+            f"Ваш общий рейтинг: <b>{row.mutual_score}/100</b>",
+            url,
+        )
+
+    return _mr_fmt(row, telegram_id)
+
+
+@router.post("/contacts/{chat_id}/mutual-rating/decline")
+async def webapp_mr_decline(
+    chat_id: int,
+    request: Request,
+    telegram_id: int = Depends(_require_webapp_auth),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    row = await mr_q.get_for_pair(db, telegram_id, chat_id)
+    if row is None or row.status != "pending":
+        raise HTTPException(404, "not_found_or_not_pending")
+    if row.target_id != telegram_id:
+        raise HTTPException(403, "not_target")
+
+    row = await mr_q.decline(db, row)
+
+    me = await users_q.get_user(db, telegram_id)
+    my_name = (me.full_name or str(telegram_id)) if me else str(telegram_id)
+
+    bot = _get_bot(request)
+    if bot:
+        await _mr_notify(
+            bot, row.requester_id,
+            f"❌ <b>{my_name}</b> отклонил(а) твой запрос на Взаимный рейтинг.",
+        )
+
+    return _mr_fmt(row, telegram_id)
+
+
+@router.delete("/contacts/{chat_id}/mutual-rating")
+async def webapp_mr_cancel(
+    chat_id: int,
+    request: Request,
+    telegram_id: int = Depends(_require_webapp_auth),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    row = await mr_q.get_for_pair(db, telegram_id, chat_id)
+    if row is None or row.status not in ("pending", "active"):
+        raise HTTPException(404, "not_found")
+
+    row = await mr_q.cancel(db, row)
+
+    me = await users_q.get_user(db, telegram_id)
+    my_name = (me.full_name or str(telegram_id)) if me else str(telegram_id)
+
+    other_id = row.target_id if row.requester_id == telegram_id else row.requester_id
+    bot = _get_bot(request)
+    if bot:
+        await _mr_notify(
+            bot, other_id,
+            f"🔕 <b>{my_name}</b> отключил(а) <b>Взаимный рейтинг</b> с тобой.",
+        )
+
+    return _mr_fmt(row, telegram_id)
 
 
 _CONNECT_PHOTO_PATH = BASE_DIR / "connecting_bot_photo" / "connecting_bot.jpg"

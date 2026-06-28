@@ -379,6 +379,59 @@ input[type=range]::-moz-range-thumb {
   padding: 8px 0;
 }
 
+/* ── Mutual Rating card ──────────────────────────────────────────────────── */
+.mr-card {
+  background: var(--bg-card);
+  border: 1px solid var(--purple-border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.mr-card.mr-pending  { border-color: rgba(214,158,46,0.4); background: rgba(214,158,46,0.06); }
+.mr-card.mr-incoming { border-color: var(--purple-border); background: rgba(124,58,237,0.08); }
+.mr-card.mr-active   { border-color: rgba(56,161,105,0.5); background: rgba(56,161,105,0.07); }
+.mr-card.mr-unavailable { opacity: 0.6; }
+
+.mr-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mr-icon { font-size: 20px; flex-shrink: 0; }
+
+.mr-action-btn {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.mr-slider-wrap { margin-top: 14px; }
+
+.mr-score-badge {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--green);
+  min-width: 36px;
+  text-align: right;
+}
+
+.mr-score-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.08);
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.mr-score-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--purple), var(--green));
+  transition: width 0.4s;
+}
+
 /* ── How to connect ─────────────────────────────────────────────────────── */
 .how-connect-toggle {
   width: 100%;
