@@ -260,9 +260,12 @@ async def get_graph(
             "avatarFileUniqueId": None,
         })
 
+    # Только рёбра, у которых source-подписчик есть в users
+    valid_subs = set(subscribers.keys())
     edges = [
         {"source": f"u:{r.source_tg}", "target": f"c:{r.target_id}", "weight": r.weight}
         for r in edge_rows
+        if r.source_tg in valid_subs
     ]
 
     return {"nodes": nodes, "edges": edges}
