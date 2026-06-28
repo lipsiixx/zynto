@@ -4,7 +4,7 @@ from __future__ import annotations
 from sqlalchemy import and_, case, desc, distinct, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import MediaCache, MessageLog, User
+from database.models import Admin, MediaCache, MessageLog, User
 
 
 # ---------------------------------------------------------------------------
@@ -218,13 +218,16 @@ async def get_graph(
     subscriber_tg_ids = {r.source_tg for r in edge_rows}
     contact_ids = {r.target_id for r in edge_rows}
 
-    # Данные подписчиков
+    # Данные подписчиков (без админов)
     subscribers: dict[int, User] = {}
     if subscriber_tg_ids:
-        rows = (await db.execute(
-            select(User).where(User.telegram_id.in_(subscriber_tg_ids))
-        )).scalars().all()
-        subscribers = {u.telegram_id: u for u in rows}
+        admin_ids = set((await db.execute(select(Admin.telegram_id))).scalars().all())
+        filtered_ids = subscriber_tg_ids - admin_ids
+        if filtered_ids:
+            rows = (await db.execute(
+                select(User).where(User.telegram_id.in_(filtered_ids))
+            )).scalars().all()
+            subscribers = {u.telegram_id: u for u in rows}
 
     # Имена контактов (берём из messages_log)
     contact_names: dict[int, tuple[str | None, str | None]] = {}

@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select, update
+from sqlalchemy import exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import User
+from database.models import Admin, User
 
 
 async def get_user(db: AsyncSession, telegram_id: int) -> User | None:
@@ -166,6 +166,9 @@ async def update_avatar(
     await db.commit()
 
 
+_admin_tg_ids = select(Admin.telegram_id)
+
+
 async def list_users(
     db: AsyncSession,
     q: str | None = None,
@@ -174,7 +177,7 @@ async def list_users(
     limit: int = 20,
 ) -> tuple[list[User], int]:
     from sqlalchemy import or_, cast, Text
-    base = select(User)
+    base = select(User).where(~exists(_admin_tg_ids.where(Admin.telegram_id == User.telegram_id)))
     if q:
         base = base.where(
             or_(
@@ -193,5 +196,10 @@ async def list_users(
 
 
 async def get_user_by_id(db: AsyncSession, user_id: int) -> User | None:
-    res = await db.execute(select(User).where(User.id == user_id))
+    res = await db.execute(
+        select(User).where(
+            User.id == user_id,
+            ~exists(_admin_tg_ids.where(Admin.telegram_id == User.telegram_id)),
+        )
+    )
     return res.scalar_one_or_none()
