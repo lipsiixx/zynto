@@ -33,6 +33,8 @@ services:
       - ./logs:/app/logs
       # proxies.txt не в образе (секреты) — монтируем с хоста, если есть
       - ./proxies.txt:/app/proxies.txt:ro
+    ports:
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
