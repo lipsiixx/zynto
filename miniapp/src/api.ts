@@ -96,3 +96,8 @@ export function getMediaUrl(fileUniqueId: string): string {
   const token = _token || localStorage.getItem('zynto_token') || ''
   return `/v1/webapp/media/${encodeURIComponent(fileUniqueId)}?token=${encodeURIComponent(token)}`
 }
+
+export function getInstructionPhotoUrl(): string {
+  const token = _token || localStorage.getItem('zynto_token') || ''
+  return `/v1/webapp/instruction-photo?token=${encodeURIComponent(token)}`
+}

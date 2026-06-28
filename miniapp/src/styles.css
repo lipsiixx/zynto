@@ -379,6 +379,66 @@ input[type=range]::-moz-range-thumb {
   padding: 8px 0;
 }
 
+/* ── How to connect ─────────────────────────────────────────────────────── */
+.how-connect-toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.how-connect-chevron {
+  font-size: 11px;
+  color: var(--text3);
+}
+
+.how-connect-body {
+  margin-top: 14px;
+}
+
+.how-connect-photo {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+  display: block;
+}
+
+.how-connect-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.how-connect-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.step-num {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--purple-d);
+  color: var(--purple-l);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* ── No subscription block ───────────────────────────────────────────────── */
 .no-sub-block {
   display: flex;

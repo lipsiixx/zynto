@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../App'
+import { getInstructionPhotoUrl } from '../api'
 
 // ── Countdown ─────────────────────────────────────────────────────────────
 
@@ -60,6 +61,54 @@ function LifetimeBadge() {
     <div className="countdown-wrap">
       <div className="countdown-label">Статус подписки</div>
       <div className="countdown-lifetime">♾ Навсегда</div>
+    </div>
+  )
+}
+
+function HowToConnect() {
+  const [open, setOpen] = useState(false)
+  const [imgError, setImgError] = useState(false)
+
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <button
+        className="how-connect-toggle"
+        onClick={() => setOpen(o => !o)}
+      >
+        <span>📋 Как подключить бота?</span>
+        <span className="how-connect-chevron">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="how-connect-body">
+          {!imgError && (
+            <img
+              src={getInstructionPhotoUrl()}
+              alt="Инструкция по подключению"
+              className="how-connect-photo"
+              onError={() => setImgError(true)}
+              loading="lazy"
+            />
+          )}
+          <div className="how-connect-steps">
+            <div className="how-connect-step">
+              <span className="step-num">1</span>
+              <span>Открой <b>Настройки → Аккаунт</b><br /><span style={{color:'var(--text3)',fontSize:12}}>iOS: Профиль → Изменить</span></span>
+            </div>
+            <div className="how-connect-step">
+              <span className="step-num">2</span>
+              <span>Найди раздел <b>«Автоматизация чатов»</b></span>
+            </div>
+            <div className="how-connect-step">
+              <span className="step-num">3</span>
+              <span>Добавь <b>@zynto_bot</b> и нажми <b>«Добавить»</b></span>
+            </div>
+          </div>
+          <div className="text-xs text3" style={{marginTop:8}}>
+            ✅ После подключения бот пришлёт подтверждение
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -149,6 +198,9 @@ export function Home() {
           </div>
         </div>
       )}
+
+      {/* How to connect — показываем когда мониторинг не активен */}
+      {hasActive && !monitoring_active && <HowToConnect />}
 
       {/* Stats */}
       {hasActive && (

@@ -28,13 +28,11 @@ def _miniapp_button(text: str = "📱 Открыть панель") -> InlineKey
 def main_menu(subscribed: bool = True, connected: bool = False) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(_miniapp_button())
+    kb.button(text="📋 Как подключить", callback_data="how_connect")
     if not subscribed:
         kb.button(text="❓ Как это работает", callback_data="how")
-        kb.adjust(1)
-        _add_stars_premium(kb)
-    else:
-        kb.adjust(1)
-        _add_stars_premium(kb)
+    kb.adjust(1)
+    _add_stars_premium(kb)
     return kb.as_markup()
 
 

@@ -92,8 +92,49 @@ async def cb_renew(call: CallbackQuery, db: AsyncSession) -> None:
     await call.answer()
 
 
+async def _send_connect_photo(bot, chat_id: int, db: AsyncSession) -> None:
+    """Отправляет фото инструкции по подключению. Кешируется в bot_settings."""
+    from aiogram.types import BufferedInputFile
+    caption = (
+        "📋 <b>Как подключить бота</b>\n\n"
+        "1️⃣ Открой <b>Настройки → Аккаунт</b> (iOS: Профиль → Изменить)\n"
+        "2️⃣ Найди раздел <b>«Автоматизация чатов»</b>\n"
+        "3️⃣ Добавь <code>@zynto_bot</code> и нажми <b>«Добавить»</b>\n\n"
+        "✅ После подключения бот пришлёт подтверждение автоматически."
+    )
+    from keyboards.user_kb import back_to_menu
+    kb = back_to_menu()
+
+    # Попробовать file_id из кеша
+    cached_id = await settings_q.get_setting(db, "connect_photo_file_id")
+    if cached_id:
+        await bot.send_photo(chat_id, cached_id, caption=caption, reply_markup=kb)
+        return
+
+    # Файл с диска — отправляем и кешируем file_id
+    if _PHOTO_PATH.exists():
+        msg = await bot.send_photo(
+            chat_id, FSInputFile(_PHOTO_PATH), caption=caption, reply_markup=kb
+        )
+        # Сохраняем file_id для следующих отправок
+        if msg.photo:
+            fid = msg.photo[-1].file_id
+            await settings_q.set_setting(db, "connect_photo_file_id", fid)
+        return
+
+    # Совсем нет фото — текст
+    await bot.send_message(chat_id, caption, reply_markup=kb)
+
+
+@router.callback_query(F.data == "how_connect")
+async def cb_how_connect(call: CallbackQuery, bot: Bot, db: AsyncSession) -> None:
+    await call.message.delete()
+    await _send_connect_photo(bot, call.from_user.id, db)
+    await call.answer()
+
+
 @router.callback_query(F.data == "connect")
-async def cb_connect(call: CallbackQuery, user: User, db: AsyncSession) -> None:
+async def cb_connect(call: CallbackQuery, user: User, bot: Bot, db: AsyncSession) -> None:
     if not sub_service.has_active_subscription(user):
         await call.message.edit_text(
             "🔒 Для мониторинга нужна активная подписка.",
@@ -107,14 +148,8 @@ async def cb_connect(call: CallbackQuery, user: User, db: AsyncSession) -> None:
         text = "✅ <b>Мониторинг активен.</b>\nПодключено к бизнес-аккаунту. Слежу за всей перепиской."
         await call.message.edit_text(text, reply_markup=back_to_menu())
     else:
-        text = "📋 <b>Подключи бота к бизнес-аккаунту</b>\n\nСледуй инструкции на фото ниже."
         await call.message.delete()
-        if _PHOTO_PATH.exists():
-            await call.message.answer_photo(
-                FSInputFile(_PHOTO_PATH), caption=text, reply_markup=back_to_menu()
-            )
-        else:
-            await call.message.answer(text, reply_markup=back_to_menu())
+        await _send_connect_photo(bot, call.from_user.id, db)
     await call.answer()
 
 

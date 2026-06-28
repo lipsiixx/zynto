@@ -17,8 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth import create_user_token, verify_user_token, verify_webapp_init_data
 from api.deps import get_db
+from config import BASE_DIR
 from database.models import MediaCache, MessageLog, User
 from database.queries import promo_codes as promo_q
+from database.queries import settings as settings_q
 from database.queries import tariffs as tariffs_q
 from database.queries import users as users_q
 from database.queries import webapp as webapp_q
@@ -323,6 +325,39 @@ async def webapp_activate(
 
     expires_at = access_expires.isoformat() if access_expires else None
     return {"type": "access", "message": "Подписка активирована!", "expires_at": expires_at}
+
+
+_CONNECT_PHOTO_PATH = BASE_DIR / "connecting_bot_photo" / "connecting_bot.jpg"
+
+
+@router.get("/instruction-photo", dependencies=[Depends(_require_webapp_auth)])
+async def webapp_instruction_photo(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Отдаёт фото инструкции по подключению (публично для авторизованных пользователей)."""
+    # Сначала ищем закешированный file_id → local_path через MediaCache
+    cached_fid = await settings_q.get_setting(db, "connect_photo_file_id")
+    if cached_fid:
+        cache_row = await db.execute(
+            select(MediaCache).where(MediaCache.file_id == cached_fid)
+        )
+        cache = cache_row.scalar_one_or_none()
+        if cache and cache.local_path:
+            path = Path(cache.local_path)
+            if path.exists():
+                etag = cache.content_hash or cache.file_unique_id
+                if request.headers.get("if-none-match") == etag:
+                    return Response(status_code=304)
+                return FileResponse(str(path), media_type="image/jpeg",
+                                    headers={"ETag": etag, "Cache-Control": "public, max-age=86400"})
+
+    # Fallback — файл на диске
+    if _CONNECT_PHOTO_PATH.exists():
+        return FileResponse(str(_CONNECT_PHOTO_PATH), media_type="image/jpeg",
+                            headers={"Cache-Control": "public, max-age=86400"})
+
+    raise HTTPException(status_code=404, detail="instruction_photo_not_found")
 
 
 _MEDIA_MIME: dict[str, str] = {
