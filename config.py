@@ -94,6 +94,9 @@ class Settings:
     # Пусто — прямое соединение.
     telegram_proxies: list[str] = field(default_factory=_load_proxies)
 
+    # TEST=true — прокси не подключаются (прямое соединение), удобно для локальной разработки.
+    test_mode: bool = field(default_factory=lambda: os.getenv("TEST", "false").lower() in ("1", "true", "yes"))
+
     @property
     def max_file_size_bytes(self) -> int:
         return self.max_file_size_mb * 1024 * 1024

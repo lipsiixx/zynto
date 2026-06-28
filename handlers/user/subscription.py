@@ -2,18 +2,20 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.types import (
     CallbackQuery,
+    FSInputFile,
     LabeledPrice,
     Message,
     PreCheckoutQuery,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import BASE_DIR
 from database.models import User
-from aiogram import Bot
 from database.queries import business as business_q
 from database.queries import promo_codes as promo_q
 from database.queries import settings as settings_q
@@ -33,19 +35,7 @@ from utils.formatters import days_left, subscription_status_text
 logger = logging.getLogger(__name__)
 router = Router(name="user-subscription")
 
-HOW_CONNECT = (
-    "📡 <b>Как подключить бота (3 простых шага):</b>\n\n"
-    "1️⃣ <b>Открой настройки профиля</b>\n"
-    "   📱 iPhone: Профиль → «Изменить»\n"
-    "   🤖 Android: Настройки → «Аккаунт»\n\n"
-    "2️⃣ <b>Найди раздел «Автоматизация чатов»</b>\n"
-    "   Пролистай список вниз до этого пункта.\n\n"
-    "3️⃣ <b>Введи имя бота и добавь его</b>\n"
-    "   Напиши в поле: <code>@zynto_bot</code>\n"
-    "   Нажми кнопку <b>«Добавить»</b> — готово!\n\n"
-    "✅ <b>Telegram Premium не требуется</b> — работает с обычным аккаунтом.\n\n"
-    "📌 После подключения бот пришлёт подтверждение автоматически."
-)
+_PHOTO_PATH = BASE_DIR / "connecting_bot_photo" / "connecting_bot.jpg"
 
 
 async def _show_subscription(target: Message, user: User, db: AsyncSession, edit: bool) -> None:
@@ -76,7 +66,8 @@ async def _show_subscription(target: Message, user: User, db: AsyncSession, edit
                     if promo.discount_tariff_id:
                         t_obj = await tariffs_q.get_tariff(db, promo.discount_tariff_id)
                         tariff_hint = f"тариф «{t_obj.name}»" if t_obj else tariff_hint
-                    lines.append(f"\n🎫 <b>Скидочный код активен:</b> −{promo.discount_stars}⭐ на {tariff_hint}")
+                    lines.append(
+                        f"\n🎫 <b>Скидочный код активен:</b> −{promo.discount_stars}⭐ на {tariff_hint}")
             text = "\n\n".join(lines)
             markup = tariffs_kb(tariffs, prefix="buy")
     if edit:
@@ -114,9 +105,16 @@ async def cb_connect(call: CallbackQuery, user: User, db: AsyncSession) -> None:
     conn = await business_q.get_active_for_user(db, user.telegram_id)
     if conn:
         text = "✅ <b>Мониторинг активен.</b>\nПодключено к бизнес-аккаунту. Слежу за всей перепиской."
+        await call.message.edit_text(text, reply_markup=back_to_menu())
     else:
-        text = HOW_CONNECT
-    await call.message.edit_text(text, reply_markup=back_to_menu())
+        text = "📋 <b>Подключи бота к бизнес-аккаунту</b>\n\nСледуй инструкции на фото ниже."
+        await call.message.delete()
+        if _PHOTO_PATH.exists():
+            await call.message.answer_photo(
+                FSInputFile(_PHOTO_PATH), caption=text, reply_markup=back_to_menu()
+            )
+        else:
+            await call.message.answer(text, reply_markup=back_to_menu())
     await call.answer()
 
 
@@ -136,13 +134,15 @@ async def cb_buy(call: CallbackQuery, user: User, db: AsyncSession) -> None:
         if promo and promo.code_type == "discount" and promo_q.is_available(promo):
             applies = promo.discount_tariff_id is None or promo.discount_tariff_id == tariff.id
             if applies:
-                discount = min(promo.discount_stars or 0, price - 1)  # цена минимум 1 XTR
+                discount = min(promo.discount_stars or 0,
+                               price - 1)  # цена минимум 1 XTR
                 price = price - discount
                 discount_note = f" (скидка {discount}⭐)"
 
     await call.message.answer_invoice(
         title=tariff.name,
-        description=(tariff.description or f"Подписка на мониторинг: {tariff.name}") + discount_note,
+        description=(
+            tariff.description or f"Подписка на мониторинг: {tariff.name}") + discount_note,
         payload=f"tariff_{tariff.id}_{call.from_user.id}",
         provider_token="",
         currency="XTR",

@@ -144,6 +144,9 @@ async def select_proxy_session() -> tuple[AiohttpSession | None, str]:
     Если прокси не заданы или ни один не отвечает — (None, "") (прямое соединение).
     URL нужен мониторингу прокси, чтобы знать, что именно отслеживать.
     """
+    if settings.test_mode:
+        logger.info("TEST-режим: прокси пропущены, прямое соединение")
+        return None, ""
     proxies = settings.telegram_proxies
     if not proxies:
         return None, ""
