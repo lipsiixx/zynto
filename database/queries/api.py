@@ -249,6 +249,7 @@ async def get_graph(
             "id": f"u:{tg_id}",
             "label": user.full_name or user.username or str(tg_id),
             "type": "subscriber",
+            "dbId": user.id,              # внутренний id для /users/{dbId}
             "avatarFileUniqueId": user.avatar_file_unique_id,
         })
     for cid in contact_ids:
