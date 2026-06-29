@@ -401,7 +401,7 @@ input[type=range]::-moz-range-thumb {
 
 .mr-icon { font-size: 20px; flex-shrink: 0; }
 
-.mr-action-btn {
+.mr-header .mr-action-btn {
   flex-shrink: 0;
   width: auto;
   padding: 8px 14px;

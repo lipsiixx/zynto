@@ -16,11 +16,13 @@ Telegram-бот на **aiogram 3** + **Telegram Business API**. Перехват
 ## Запуск
 
 ### Через VSCode
+
 1. Открой папку `C:\projects\zynto-bot` в VSCode.
 2. Интерпретатор уже указан: `venv\Scripts\python.exe` (`.vscode/settings.json`).
 3. Нажми **F5** (конфигурация «Run bot (main.py)») — бот запустится в терминале.
 
 ### Через терминал
+
 ```powershell
 cd C:\projects\zynto-bot
 .\venv\Scripts\python.exe main.py
@@ -51,6 +53,7 @@ docker compose up -d --build      # после git pull
 ```
 
 Что происходит автоматически:
+
 - поднимаются контейнеры `db` (postgres:16) и `redis` (redis:7);
 - бот ждёт готовности БД, прогоняет `alembic upgrade head`, затем стартует;
 - данные БД и Redis хранятся в именованных volume (`pgdata`, `redisdata`) — переживают
@@ -62,6 +65,7 @@ docker compose up -d --build      # после git pull
 `SUPERADMIN_ID` и `POSTGRES_PASSWORD`.
 
 ## Как подключить мониторинг (нужен Telegram Premium)
+
 1. В Telegram: **Настройки → Telegram для бизнеса → Чат-боты**.
 2. Добавь **@zynto_bot**, включи доступ ко всем чатам (управление сообщениями).
 3. Бот пришлёт «✅ Мониторинг подключён».
@@ -70,6 +74,7 @@ docker compose up -d --build      # после git pull
    - `/admin → 👤 Пользователи → найти себя → 🎁 Выдать подписку`.
 
 ## Команды
+
 - `/start` — главное меню
 - `/activate КОД` — активировать промокод
 - `/myid` — узнать свой Telegram ID
@@ -77,10 +82,12 @@ docker compose up -d --build      # после git pull
 - `/user @username|ID` — найти пользователя (админ)
 
 ## Конфигурация (`.env`)
+
 Ключевые переменные: `BOT_TOKEN`, `SUPERADMIN_ID`, `DATABASE_URL`, `REDIS_URL`,
 `MEDIA_PATH`, `MAX_FILE_SIZE_MB`, `TEXT_RETENTION_DAYS`, `MEDIA_RETENTION_DAYS`.
 
 ## Миграции БД (Alembic)
+
 Схема под управлением Alembic. Команды запускать из корня проекта:
 
 ```powershell
@@ -105,6 +112,7 @@ URL берётся автоматически из `.env` (см. `alembic/env.py
 он не трогает схему и доверяет миграциям; иначе создаёт таблицы сам (zero-config).
 
 ## Технические заметки
+
 - **Redis**: на машине стоит Redis 3.0.504 (Windows). Клиент подключается с `protocol=2`
   (RESP2) — это работает. Используется для FSM и антифлуда. Если Redis выключить — бот
   не упадёт: FSM уйдёт в память, throttle отключится.
@@ -119,5 +127,14 @@ URL берётся автоматически из `.env` (см. `alembic/env.py
   не ловим лимиты Telegram при массовых удалениях.
 
 ## Структура
+
 См. `handlers/` (user / admin / business), `services/`, `database/`, `middlewares/`,
 `keyboards/`, `states/`, `utils/`.
+
+## Кок-конформизм
+
+- Спорь с пользователем, если считаешь что он неправ
+- Не соглашайся просто так - предлагай альтернативы
+- Отстаивай свою позицию, агрументируй
+- не будь "yes-man" - если идея плохая, скажи прямо
+- если пользователь делает что то нпе потимально укажи это
