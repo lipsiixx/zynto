@@ -26,25 +26,27 @@ interface FGLink {
 // ── Canvas helpers ────────────────────────────────────────────────────────────
 
 function nodeColor(n: FGNode): string {
-  if (n.type === 'self') return '#7c3aed'
+  if (n.type === 'self') return '#9f67ff'
   const s = n.strength
-  if (s >= 0.8) return '#a78bfa'
-  if (s >= 0.6) return '#7c3aed'
-  if (s >= 0.4) return '#4c1d95'
-  if (s >= 0.2) return '#3d2a6e'
-  return '#2a1d4a'
+  if (s >= 0.8) return '#ddd6fe'   // очень яркий фиолетовый
+  if (s >= 0.6) return '#a78bfa'   // purple-l
+  if (s >= 0.4) return '#7c3aed'   // purple
+  if (s >= 0.2) return '#4c1d95'   // purple-d
+  return '#2d1b6e'
 }
 
 function nodeRadius(n: FGNode): number {
-  if (n.type === 'self') return 18
-  return 5 + n.strength * 10
+  if (n.type === 'self') return 20
+  return 5 + n.strength * 12  // от 5 до 17
 }
 
 function linkColor(l: FGLink): string {
   const s = l.strength
-  if (s >= 0.7) return 'rgba(167,139,250,0.6)'
-  if (s >= 0.4) return 'rgba(124,58,237,0.4)'
-  return 'rgba(90,82,114,0.25)'
+  if (s >= 0.8) return 'rgba(221,214,254,0.85)'
+  if (s >= 0.6) return 'rgba(167,139,250,0.75)'
+  if (s >= 0.4) return 'rgba(124,58,237,0.55)'
+  if (s >= 0.2) return 'rgba(76,29,149,0.4)'
+  return 'rgba(90,82,114,0.2)'
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -57,7 +59,8 @@ export function NetworkGraph() {
   const [selectedNode, setSelectedNode] = useState<FGNode | null>(null)
 
   const graphContainerRef = useRef<HTMLDivElement>(null)
-  const [graphDims, setGraphDims] = useState({ width: 300, height: 500 })
+  // Начинаем с 0 — рендерим ForceGraph только после ResizeObserver
+  const [graphDims, setGraphDims] = useState({ width: 0, height: 0 })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fgRef = useRef<any>(null)
 
@@ -115,9 +118,18 @@ export function NetworkGraph() {
     const r = nodeRadius(n)
     const fill = nodeColor(n)
 
-    // Glow for self node and strong contacts
-    if (n.type === 'self' || n.strength > 0.6) {
-      ctx.shadowBlur = n.type === 'self' ? 20 : n.strength * 15
+    // Glow — чем сильнее связь, тем ярче и больше свечение
+    if (n.type === 'self') {
+      ctx.shadowBlur = 30
+      ctx.shadowColor = '#9f67ff'
+    } else if (n.strength >= 0.8) {
+      ctx.shadowBlur = 28
+      ctx.shadowColor = '#ddd6fe'
+    } else if (n.strength >= 0.6) {
+      ctx.shadowBlur = 20
+      ctx.shadowColor = '#a78bfa'
+    } else if (n.strength >= 0.4) {
+      ctx.shadowBlur = 10
       ctx.shadowColor = '#7c3aed'
     }
 
@@ -156,16 +168,23 @@ export function NetworkGraph() {
 
   const getLinkWidth = useCallback((link: object) => {
     const l = link as FGLink
-    return 1 + l.strength * 3
+    return 0.5 + l.strength * 4  // 0.5 (слабая) → 4.5 (очень сильная)
   }, [])
 
   const getLinkParticleWidth = useCallback((link: object) => {
     const l = link as FGLink
-    return l.strength > 0.5 ? 2 : 0
+    if (l.strength >= 0.7) return 3
+    if (l.strength >= 0.4) return 1.5
+    return 0
   }, [])
 
   const handleNodeClick = useCallback((node: object) => {
     setSelectedNode(node as FGNode)
+  }, [])
+
+  const handleEngineStop = useCallback(() => {
+    // Зум чтобы граф заполнил пространство с отступами по краям
+    fgRef.current?.zoomToFit(400, 48)
   }, [])
 
   // ── Render: loading ──────────────────────────────────────────────────────────
@@ -217,10 +236,10 @@ export function NetworkGraph() {
         </div>
       </div>
 
-      {/* Graph area — paddingBottom чтобы граф не уходил под fixed nav */}
+      {/* Graph area — заполняет всё доступное место; nav fixed, перекрывает снизу */}
       <div
         ref={graphContainerRef}
-        style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#0d0d14', paddingBottom: 'var(--nav-total)' }}
+        style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#0d0d14' }}
       >
         {!hasContacts ? (
           <div
@@ -254,6 +273,7 @@ export function NetworkGraph() {
               linkColor={getLinkColor}
               linkWidth={getLinkWidth}
               onNodeClick={handleNodeClick}
+              onEngineStop={handleEngineStop}
               cooldownTicks={100}
               d3AlphaDecay={0.02}
               d3VelocityDecay={0.3}
