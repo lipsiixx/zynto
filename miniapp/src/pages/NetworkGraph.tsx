@@ -58,6 +58,8 @@ export function NetworkGraph() {
 
   const graphContainerRef = useRef<HTMLDivElement>(null)
   const [graphDims, setGraphDims] = useState({ width: 300, height: 500 })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fgRef = useRef<any>(null)
 
   // Load graph on mount
   useEffect(() => {
@@ -67,6 +69,14 @@ export function NetworkGraph() {
       .catch(() => showToast('Ошибка загрузки графа', 'error'))
       .finally(() => setLoading(false))
   }, [showToast])
+
+  // Spread nodes apart: strong repulsion + longer link distance
+  useEffect(() => {
+    if (!fgRef.current || !graphData) return
+    fgRef.current.d3Force('charge')?.strength(-400)
+    fgRef.current.d3Force('link')?.distance(120)
+    fgRef.current.d3ReheatSimulation()
+  }, [graphData])
 
   // Measure container for ForceGraph2D dimensions
   useEffect(() => {
@@ -234,6 +244,7 @@ export function NetworkGraph() {
         ) : (
           graphDims.width > 0 && graphDims.height > 0 && (
             <ForceGraph2D
+              ref={fgRef}
               graphData={fgData}
               width={graphDims.width}
               height={graphDims.height}
