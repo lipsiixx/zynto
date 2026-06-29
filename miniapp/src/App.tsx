@@ -10,6 +10,7 @@ import { ContactDetail } from './pages/ContactDetail'
 import { Subscription } from './pages/Subscription'
 import { Activate } from './pages/Activate'
 import { Referral } from './pages/Referral'
+import { NetworkGraph } from './pages/NetworkGraph'
 
 // ── Context ───────────────────────────────────────────────────────────────
 
@@ -138,6 +139,7 @@ export default function App() {
           <Route path="/subscription" element={<Subscription />} />
           <Route path="/activate" element={<Activate />} />
           <Route path="/referral" element={<Referral />} />
+          <Route path="/network" element={<NetworkGraph />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <BottomNav />

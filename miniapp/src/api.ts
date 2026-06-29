@@ -1,4 +1,4 @@
-import type { Contact, DayStat, Me, MessageEvent, MutualRating, ReferralStats, Tariff } from './types'
+import type { Contact, DayStat, Me, MessageEvent, MutualRating, NetworkGraph, NetworkStatus, ReferralStats, Tariff } from './types'
 
 const BASE = '/v1/webapp'
 
@@ -130,4 +130,22 @@ export async function getReferral(): Promise<ReferralStats> {
 export function getInstructionPhotoUrl(): string {
   const token = _token || localStorage.getItem('zynto_token') || ''
   return `/v1/webapp/instruction-photo?token=${encodeURIComponent(token)}`
+}
+
+// ── Network ───────────────────────────────────────────────────────────────────
+
+export async function getNetworkStatus(): Promise<NetworkStatus> {
+  return req('GET', '/network/status')
+}
+
+export async function joinNetwork(visible: boolean): Promise<NetworkStatus> {
+  return req('POST', '/network/join', { visible })
+}
+
+export async function updateNetworkSettings(visible: boolean): Promise<{ visible: boolean }> {
+  return req('PUT', '/network/settings', { visible })
+}
+
+export async function getNetworkGraph(depth: 1 | 2 = 1): Promise<NetworkGraph> {
+  return req('GET', `/network/graph?depth=${depth}`)
 }

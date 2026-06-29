@@ -92,3 +92,34 @@ export interface Tariff {
   duration_days: number | null
   price_stars: number
 }
+
+// ── Network ───────────────────────────────────────────────────────────────────
+
+export interface NetworkStatus {
+  in_network: boolean
+  consent_at: string | null
+  visible: boolean
+}
+
+export interface NetworkNode {
+  id: string
+  label: string
+  type: 'self' | 'first' | 'second'
+  has_subscription: boolean
+  message_count: number
+  trust_score: number | null
+}
+
+export interface NetworkEdge {
+  source: string
+  target: string
+  weight: number
+  trust_score: number | null
+}
+
+export interface NetworkGraph {
+  nodes: NetworkNode[]
+  edges: NetworkEdge[]
+  is_premium: boolean
+  total_in_network: number
+}

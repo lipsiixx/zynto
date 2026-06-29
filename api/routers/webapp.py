@@ -84,6 +84,14 @@ class MRRespondBody(BaseModel):
     score: int     # 0-100
 
 
+class NetworkJoinBody(BaseModel):
+    visible: bool = True
+
+
+class NetworkSettingsBody(BaseModel):
+    visible: bool
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────
 
 @router.post("/auth", response_model=WebAppAuthResponse)
@@ -660,3 +668,58 @@ async def webapp_media(
             "Accept-Ranges": "bytes",
         },
     )
+
+
+# ── Network endpoints ─────────────────────────────────────────────────────
+
+@router.get("/network/status")
+async def webapp_network_status(
+    telegram_id: int = Depends(_require_webapp_auth),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Статус пользователя в сети связей."""
+    return await webapp_q.get_network_status(db, telegram_id)
+
+
+@router.post("/network/join")
+async def webapp_network_join(
+    body: NetworkJoinBody,
+    telegram_id: int = Depends(_require_webapp_auth),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Вступить в сеть связей (устанавливает consent_at)."""
+    return await webapp_q.join_network(db, telegram_id, body.visible)
+
+
+@router.put("/network/settings")
+async def webapp_network_settings(
+    body: NetworkSettingsBody,
+    telegram_id: int = Depends(_require_webapp_auth),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Обновить видимость пользователя в сети."""
+    return await webapp_q.update_network_visibility(db, telegram_id, body.visible)
+
+
+@router.get("/network/graph")
+async def webapp_network_graph(
+    depth: int = Query(1, ge=1, le=2),
+    telegram_id: int = Depends(_require_webapp_auth),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Граф сети связей. depth=2 только для premium-пользователей."""
+    user = await users_q.get_user(db, telegram_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="user_not_found")
+
+    has_sub = sub_service.has_active_subscription(user)
+    graph = await webapp_q.get_network_graph(db, telegram_id, is_premium=has_sub)
+
+    # depth=1 или нет подписки — убрать узлы и рёбра 2-го уровня из ответа,
+    # но is_premium отражает наличие подписки (нужно фронтенду для показа переключателя)
+    if depth == 1 or not has_sub:
+        second_ids = {n["id"] for n in graph["nodes"] if n["type"] == "second"}
+        graph["nodes"] = [n for n in graph["nodes"] if n["type"] != "second"]
+        graph["edges"] = [e for e in graph["edges"] if e["target"] not in second_ids]
+
+    return graph

@@ -49,6 +49,8 @@ class User(Base):
     nudge_next_at: Mapped[datetime | None] = mapped_column(_ts())     # запланированное время следующего
     created_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
     last_active_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
+    network_visible: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    network_consent_at: Mapped[datetime | None] = mapped_column(_ts())
 
 
 class Admin(Base):
