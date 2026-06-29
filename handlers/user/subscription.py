@@ -191,24 +191,38 @@ async def pre_checkout(query: PreCheckoutQuery) -> None:
     await query.answer(ok=True)
 
 
-async def _reward_referrer(db: AsyncSession, bot: Bot, user: User) -> None:
-    if not user.referred_by or user.referral_rewarded:
+async def _reward_referrer(db: AsyncSession, bot: Bot, user: User, payment_method: str = "stars") -> None:
+    if not user.referred_by:
         return
-    bonus_days = await settings_q.get_int_setting(db, "referral_bonus_days", 1)
-    if bonus_days <= 0:
+    enabled = await settings_q.get_setting(db, "referral_enabled", "1")
+    if enabled == "0":
+        return
+    reward_days = await settings_q.get_int_setting(db, "referral_reward_days", 3)
+    if reward_days <= 0:
         return
     referrer = await users_q.get_user(db, user.referred_by)
     if referrer is None:
         return
+
+    from database.queries import referral as referral_q
     await sub_service.activate_subscription(
-        db, referrer, duration_days=bonus_days, payment_method="referral"
+        db, referrer, duration_days=reward_days, payment_method="referral"
     )
-    await users_q.set_referral_rewarded(db, user.telegram_id)
-    label = "день" if bonus_days == 1 else f"{bonus_days} дн."
+    await referral_q.record_reward(db, referrer.telegram_id, user.telegram_id, reward_days, payment_method)
+    await db.commit()
+
+    def _days_label(n: int) -> str:
+        if n % 10 == 1 and n % 100 != 11:
+            return f"{n} день"
+        if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
+            return f"{n} дня"
+        return f"{n} дней"
+
     try:
         await bot.send_message(
             referrer.telegram_id,
-            f"🎉 <b>Твой друг оформил подписку!</b>\n\nТебе начислен бонус: +{label} бесплатного доступа.",
+            f"🎉 <b>Твой друг оформил подписку!</b>\n\n"
+            f"Тебе начислен бонус: +{_days_label(reward_days)} бесплатного доступа.",
         )
     except Exception:  # noqa: BLE001
         pass

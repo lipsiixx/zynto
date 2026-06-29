@@ -9,6 +9,7 @@ import { Contacts } from './pages/Contacts'
 import { ContactDetail } from './pages/ContactDetail'
 import { Subscription } from './pages/Subscription'
 import { Activate } from './pages/Activate'
+import { Referral } from './pages/Referral'
 
 // ── Context ───────────────────────────────────────────────────────────────
 
@@ -136,6 +137,7 @@ export default function App() {
           <Route path="/contacts/:chatId" element={<ContactDetail />} />
           <Route path="/subscription" element={<Subscription />} />
           <Route path="/activate" element={<Activate />} />
+          <Route path="/referral" element={<Referral />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <BottomNav />

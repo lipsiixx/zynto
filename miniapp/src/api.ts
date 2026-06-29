@@ -1,4 +1,4 @@
-import type { Contact, DayStat, Me, MessageEvent, MutualRating, Tariff } from './types'
+import type { Contact, DayStat, Me, MessageEvent, MutualRating, ReferralStats, Tariff } from './types'
 
 const BASE = '/v1/webapp'
 
@@ -121,6 +121,10 @@ export async function declineMR(chatId: number): Promise<MutualRating> {
 
 export async function cancelMR(chatId: number): Promise<MutualRating> {
   return req('DELETE', `/contacts/${chatId}/mutual-rating`)
+}
+
+export async function getReferral(): Promise<ReferralStats> {
+  return req('GET', '/referral')
 }
 
 export function getInstructionPhotoUrl(): string {

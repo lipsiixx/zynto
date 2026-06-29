@@ -88,7 +88,8 @@ def confirm_kb(yes_cb: str, no_cb: str = "a:main") -> InlineKeyboardMarkup:
 
 def referral_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text="✏️ Изменить бонус", callback_data="a:referral_edit")
+    kb.button(text="🔄 Вкл/Выкл программу", callback_data="a:referral_toggle")
+    kb.button(text="✏️ Изменить кол-во дней", callback_data="a:referral_edit")
     kb.button(text="⬅️ В админку", callback_data="a:main")
     kb.adjust(1)
     return kb.as_markup()

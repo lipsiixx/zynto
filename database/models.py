@@ -231,6 +231,17 @@ class MutualRating(Base):
     )
 
 
+class ReferralReward(Base):
+    __tablename__ = "referral_rewards"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    referrer_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    referred_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    days_granted: Mapped[int] = mapped_column(Integer, nullable=False)
+    payment_method: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
+
+
 class BotSetting(Base):
     __tablename__ = "bot_settings"
 

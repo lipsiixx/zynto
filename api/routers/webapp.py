@@ -19,6 +19,7 @@ from api.auth import create_user_token, verify_user_token, verify_webapp_init_da
 from api.deps import get_db
 from config import BASE_DIR
 from database.models import MediaCache, MessageLog, MutualRating, User
+from database.queries import referral as referral_q
 from database.queries import business as biz_q
 from database.queries import mutual_rating as mr_q
 from database.queries import promo_codes as promo_q
@@ -539,6 +540,34 @@ async def webapp_mr_cancel(
         )
 
     return _mr_fmt(row, telegram_id)
+
+
+# ── Referral endpoints ────────────────────────────────────────────────────
+
+@router.get("/referral")
+async def webapp_referral(
+    request: Request,
+    telegram_id: int = Depends(_require_webapp_auth),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Реферальная ссылка и статистика пользователя."""
+    bot: Bot | None = _get_bot(request)
+    if bot:
+        me = await bot.get_me()
+        link = f"https://t.me/{me.username}?start=ref{telegram_id}"
+    else:
+        link = f"https://t.me/zynto_bot?start=ref{telegram_id}"
+
+    stats = await referral_q.get_stats_for_referrer(db, telegram_id)
+    reward_days = await settings_q.get_int_setting(db, "referral_reward_days", 3)
+    enabled = (await settings_q.get_setting(db, "referral_enabled", "1")) != "0"
+
+    return {
+        "link": link,
+        "reward_days": reward_days,
+        "enabled": enabled,
+        **stats,
+    }
 
 
 _CONNECT_PHOTO_PATH = BASE_DIR / "connecting_bot_photo" / "connecting_bot.jpg"

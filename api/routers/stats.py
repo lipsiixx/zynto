@@ -9,6 +9,7 @@ import psutil
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fastapi import Body
 from api.deps import get_db, require_auth
 from api.schemas import (
     CpuOut,
@@ -22,6 +23,8 @@ from api.schemas import (
     UserStatsOut,
 )
 from database.queries import api as api_q
+from database.queries import referral as referral_q
+from database.queries import settings as settings_q
 from database.queries import users as users_q
 from services import proxy_monitor as pm_module
 
@@ -137,3 +140,34 @@ async def user_chat_stats(
         raise HTTPException(404, detail="not_found")
     stats = await api_q.get_user_chat_stats(db, user.telegram_id, chat_id)
     return UserChatStatsOut(**stats)
+
+
+# ── Referral admin endpoints ───────────────────────────────────────────────
+
+@router.get("/referrals")
+async def admin_referrals(
+    page: int = 1,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Список всех реферальных наград."""
+    rewards, total = await referral_q.list_all_rewards(db, page=page, limit=limit)
+    return {"data": rewards, "total": total, "page": page}
+
+
+@router.get("/referrals/settings")
+async def admin_referral_settings(db: AsyncSession = Depends(get_db)) -> dict:
+    enabled = (await settings_q.get_setting(db, "referral_enabled", "1")) != "0"
+    reward_days = await settings_q.get_int_setting(db, "referral_reward_days", 3)
+    return {"enabled": enabled, "reward_days": reward_days}
+
+
+@router.put("/referrals/settings")
+async def admin_referral_settings_update(
+    enabled: bool = Body(...),
+    reward_days: int = Body(..., ge=1, le=365),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    await settings_q.set_setting(db, "referral_enabled", "1" if enabled else "0")
+    await settings_q.set_setting(db, "referral_reward_days", str(reward_days))
+    return {"enabled": enabled, "reward_days": reward_days}
