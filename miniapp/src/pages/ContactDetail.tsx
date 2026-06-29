@@ -357,12 +357,12 @@ function MutualRatingCard({
       <div className="mr-card">
         <div className="mr-header">
           <span className="mr-icon">🤝</span>
-          <div>
+          <div style={{ flex: 1 }}>
             <div className="semibold" style={{ fontSize: 13 }}>Взаимный рейтинг</div>
             <div className="text-xs text3">Оба выставят оценку — увидите среднее</div>
           </div>
           <button
-            className="btn btn-secondary mr-action-btn"
+            className="btn btn-primary mr-action-btn"
             onClick={() => setShowMrSlider(!showMrSlider)}
           >
             Предложить
