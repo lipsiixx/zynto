@@ -190,7 +190,6 @@ export function NetworkGraph() {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        paddingBottom: 'var(--nav-total)',
       }}
     >
       {/* Top bar */}
@@ -218,10 +217,10 @@ export function NetworkGraph() {
         </div>
       </div>
 
-      {/* Graph area */}
+      {/* Graph area — paddingBottom чтобы граф не уходил под fixed nav */}
       <div
         ref={graphContainerRef}
-        style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#0d0d14' }}
+        style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#0d0d14', paddingBottom: 'var(--nav-total)' }}
       >
         {!hasContacts ? (
           <div
