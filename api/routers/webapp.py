@@ -703,23 +703,8 @@ async def webapp_network_settings(
 
 @router.get("/network/graph")
 async def webapp_network_graph(
-    depth: int = Query(1, ge=1, le=2),
     telegram_id: int = Depends(_require_webapp_auth),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Граф сети связей. depth=2 только для premium-пользователей."""
-    user = await users_q.get_user(db, telegram_id)
-    if user is None:
-        raise HTTPException(status_code=404, detail="user_not_found")
-
-    has_sub = sub_service.has_active_subscription(user)
-    graph = await webapp_q.get_network_graph(db, telegram_id, is_premium=has_sub)
-
-    # depth=1 или нет подписки — убрать узлы и рёбра 2-го уровня из ответа,
-    # но is_premium отражает наличие подписки (нужно фронтенду для показа переключателя)
-    if depth == 1 or not has_sub:
-        second_ids = {n["id"] for n in graph["nodes"] if n["type"] == "second"}
-        graph["nodes"] = [n for n in graph["nodes"] if n["type"] != "second"]
-        graph["edges"] = [e for e in graph["edges"] if e["target"] not in second_ids]
-
-    return graph
+    """Граф контактов пользователя — только собственные контакты."""
+    return await webapp_q.get_network_graph(db, telegram_id, is_premium=False)

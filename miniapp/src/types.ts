@@ -104,10 +104,10 @@ export interface NetworkStatus {
 export interface NetworkNode {
   id: string
   label: string
-  type: 'self' | 'first' | 'second'
-  has_subscription: boolean
+  type: 'self' | 'contact'
   message_count: number
   trust_score: number | null
+  strength: number  // 0-1
 }
 
 export interface NetworkEdge {
@@ -115,11 +115,10 @@ export interface NetworkEdge {
   target: string
   weight: number
   trust_score: number | null
+  strength: number
 }
 
 export interface NetworkGraph {
   nodes: NetworkNode[]
   edges: NetworkEdge[]
-  is_premium: boolean
-  total_in_network: number
 }

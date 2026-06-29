@@ -146,6 +146,6 @@ export async function updateNetworkSettings(visible: boolean): Promise<{ visible
   return req('PUT', '/network/settings', { visible })
 }
 
-export async function getNetworkGraph(depth: 1 | 2 = 1): Promise<NetworkGraph> {
-  return req('GET', `/network/graph?depth=${depth}`)
+export async function getNetworkGraph(): Promise<NetworkGraph> {
+  return req('GET', '/network/graph')
 }
