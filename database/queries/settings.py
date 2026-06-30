@@ -1,11 +1,17 @@
 """Работа с таблицей bot_settings."""
 from __future__ import annotations
 
+import json
+import logging
+from typing import Any
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings as cfg
 from database.models import BotSetting
+
+logger = logging.getLogger(__name__)
 
 
 async def get_setting(db: AsyncSession, key: str, default: str | None = None) -> str | None:
@@ -22,6 +28,23 @@ async def get_int_setting(db: AsyncSession, key: str, default: int) -> int:
         return int(raw)
     except ValueError:
         return default
+
+
+async def get_json_setting(db: AsyncSession, key: str, default: Any = None) -> Any:
+    """Читает bot_settings[key], парсит JSON, при ошибке возвращает default."""
+    raw = await get_setting(db, key)
+    if raw is None:
+        return default
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        logger.warning("Не удалось распарсить JSON-настройку %s", key)
+        return default
+
+
+async def set_json_setting(db: AsyncSession, key: str, value: Any, updated_by: int | None = None) -> None:
+    """Сериализует value в JSON и сохраняет в bot_settings[key]."""
+    await set_setting(db, key, json.dumps(value, ensure_ascii=False), updated_by=updated_by)
 
 
 async def set_setting(db: AsyncSession, key: str, value: str, updated_by: int | None = None) -> None:

@@ -131,19 +131,32 @@ async def _handle_subscription(db: AsyncSession, payload: dict, bot: Bot | None)
 async def _handle_digital_product(db: AsyncSession, payload: dict, bot: Bot | None) -> None:
     telegram_user_id = payload.get("telegram_user_id")
     purchase_id = payload.get("purchase_id")
+    product_id = payload.get("product_id")
 
     user = await users_q.get_user(db, telegram_user_id)
     if user is None:
         logger.warning("Tribute: пользователь %s не найден (purchase_id=%s)", telegram_user_id, purchase_id)
         return
 
-    days = await settings_q.get_int_setting(db, "tribute_digital_product_days", 30)
+    products: list[dict] = await settings_q.get_json_setting(db, "tribute_sbp_products", []) or []
+    matched = next((p for p in products if p.get("tribute_product_id") == product_id), None)
+
+    if matched is not None:
+        days = matched.get("duration_days")
+    else:
+        logger.warning(
+            "Tribute: продукт %s не найден в tribute_sbp_products, использую fallback tribute_digital_product_days",
+            product_id,
+        )
+        days = await settings_q.get_int_setting(db, "tribute_digital_product_days", 30)
+
+    duration_days = days if days else None
 
     try:
         expires_at = await sub_service.activate_subscription(
             db,
             user,
-            duration_days=days,
+            duration_days=duration_days,
             payment_method="tribute_sbp",
             telegram_payment_charge_id=f"tribute_product_{purchase_id}",
         )

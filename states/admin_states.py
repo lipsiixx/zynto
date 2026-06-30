@@ -76,4 +76,4 @@ class NudgeStates(StatesGroup):
 
 
 class TributeSettingsStates(StatesGroup):
-    waiting_url = State()
+    waiting_days = State()

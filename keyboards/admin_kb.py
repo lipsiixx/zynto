@@ -99,16 +99,9 @@ def referral_kb() -> InlineKeyboardMarkup:
 def tribute_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="🔄 Загрузить из Tribute", callback_data="a:tribute_load_products")
-    kb.button(text="✏️ Изменить URL вручную", callback_data="a:tribute_set_url")
-    kb.button(text="🗑 Сбросить", callback_data="a:tribute_clear_url")
+    kb.button(text="🗑 Очистить список", callback_data="a:tribute_clear_products")
     kb.button(text="⬅️ В админку", callback_data="a:main")
     kb.adjust(1)
-    return kb.as_markup()
-
-
-def tribute_set_url_kb() -> InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    kb.button(text="⬅️ Отмена", callback_data="a:tribute_settings")
     return kb.as_markup()
 
 
@@ -121,6 +114,19 @@ def tribute_products_kb(products: list[dict]) -> InlineKeyboardMarkup:
         kb.button(text=f"{name} — {amount:g} {currency}", callback_data=f"a:tribute_pick:{i}")
     kb.adjust(1)
     kb.row(InlineKeyboardButton(text="⬅️ Отмена", callback_data="a:tribute_settings"))
+    return kb.as_markup()
+
+
+def tribute_days_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="30 дней — 1 месяц", callback_data="a:tribute_set_days:30")
+    kb.button(text="90 дней — 3 месяца", callback_data="a:tribute_set_days:90")
+    kb.button(text="180 дней — полгода", callback_data="a:tribute_set_days:180")
+    kb.button(text="365 дней — 1 год", callback_data="a:tribute_set_days:365")
+    kb.button(text="♾ Навсегда", callback_data="a:tribute_set_days:0")
+    kb.button(text="✏️ Ввести вручную", callback_data="a:tribute_days_custom")
+    kb.adjust(2)
+    kb.row(InlineKeyboardButton(text="❌ Отмена", callback_data="a:tribute_settings"))
     return kb.as_markup()
 
 

@@ -678,14 +678,14 @@ async def webapp_media(
     )
 
 
-@router.get("/tribute-url")
-async def webapp_tribute_url(
+@router.get("/tribute-products")
+async def webapp_tribute_products(
     _: int = Depends(_require_webapp_auth),
     db: AsyncSession = Depends(get_db),
-) -> dict:
-    """URL страницы оплаты через Tribute (СБП). Null если не настроен."""
-    url = await settings_q.get_setting(db, "tribute_payment_url")
-    return {"url": url}
+) -> list[dict]:
+    """Список продуктов Tribute (СБП) со сроками подписки."""
+    products = await settings_q.get_json_setting(db, "tribute_sbp_products", [])
+    return products or []
 
 
 # ── Network endpoints ─────────────────────────────────────────────────────

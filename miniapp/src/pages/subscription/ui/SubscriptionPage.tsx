@@ -1,9 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { Tariff } from '@/entities/tariff'
-import { getTariffs, getTributeUrl } from '@/entities/tariff'
+import type { Tariff, TributeProduct } from '@/entities/tariff'
+import { getTariffs, getTributeProducts } from '@/entities/tariff'
 import { BuyButton } from '@/features/buy-subscription'
 import { useApp } from '@/app/AppContext'
+
+function openSbpLink(url: string) {
+  const tg = window.Telegram?.WebApp
+  if (tg?.openLink) {
+    tg.openLink(url, { try_instant_view: false })
+  } else {
+    window.open(url, '_blank')
+  }
+}
 
 function fmtDuration(days: number | null) {
   if (days === null) return '♾ Навсегда'
@@ -45,14 +54,14 @@ export function SubscriptionPage() {
   const navigate = useNavigate()
   const [tariffs, setTariffs] = useState<Tariff[]>([])
   const [loading, setLoading] = useState(true)
-  const [tributeUrl, setTributeUrl] = useState<string | null>(null)
+  const [tributeProducts, setTributeProducts] = useState<TributeProduct[]>([])
 
   useEffect(() => {
     getTariffs().then(r => setTariffs(r.data)).finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
-    getTributeUrl().then(setTributeUrl)
+    getTributeProducts().then(setTributeProducts).catch(() => setTributeProducts([]))
   }, [])
 
   return (
@@ -99,32 +108,34 @@ export function SubscriptionPage() {
           ))
         )}
 
-        <div className="divider" />
-
-        {tributeUrl && (
+        {tributeProducts.length > 0 && (
           <>
-            <div className="text-sm text2 mb-12" style={{ marginTop: 20 }}>Оплата через СБП</div>
-            <button
-              className="btn"
-              style={{ background: 'linear-gradient(135deg, #1a73e8, #0d5dbf)', marginBottom: 12 }}
-              onClick={() => {
-                const tg = window.Telegram?.WebApp
-                if (tg?.openLink) {
-                  tg.openLink(tributeUrl)
-                } else {
-                  window.open(tributeUrl, '_blank')
-                }
-              }}
-            >
-              🏦 Оплатить через СБП
-            </button>
-            <div className="text-xs text3" style={{ textAlign: 'center', marginBottom: 16 }}>
-              Оплата через Tribute — без комиссии за конвертацию
-            </div>
+            <div className="divider" />
+            <section>
+              <div className="text-sm text2 mb-12">Оплата через СБП</div>
+              <div className="tariff-list">
+                {tributeProducts.map(p => (
+                  <div
+                    key={p.tribute_product_id}
+                    className="tariff-card"
+                    onClick={() => openSbpLink(p.web_link)}
+                  >
+                    <div className="tariff-name">{p.name}</div>
+                    <div className="tariff-price">
+                      {p.price > 0 ? `${(p.price / 100).toLocaleString('ru-RU')} ${p.currency}` : 'Бесплатно'}
+                    </div>
+                    <div className="tariff-duration">
+                      {p.duration_days === 0 ? '♾ навсегда' : `${p.duration_days} дней`}
+                    </div>
+                    <button className="btn btn-primary tariff-btn">Оплатить СБП</button>
+                  </div>
+                ))}
+              </div>
+            </section>
           </>
         )}
 
-        <button className="btn btn-secondary" onClick={() => navigate('/activate')}>
+        <button className="btn btn-secondary mt-16" onClick={() => navigate('/activate')}>
           🎟 Активировать промокод
         </button>
       </div>
