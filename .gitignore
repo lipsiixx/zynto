@@ -10,5 +10,6 @@ media/
 *.log
 .DS_Store
 media-backup/
+media_backup.tar.gz
 proxies.txt
 miniapp/node_modules/
