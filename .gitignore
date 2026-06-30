@@ -13,3 +13,4 @@ media-backup/
 media_backup.tar.gz
 proxies.txt
 miniapp/node_modules/
+miniapp/.env.local

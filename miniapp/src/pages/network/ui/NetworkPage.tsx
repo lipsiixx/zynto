@@ -23,21 +23,68 @@ interface FGLink {
   strength: number;
 }
 
+// ── Graph Settings ────────────────────────────────────────────────────────────
+
+const SETTINGS_KEY = "miniapp_graph_settings";
+
+interface GraphSettings {
+  repulsion: number;   // 0–100
+  nodeSize: number;    // 0–100
+  linkWidth: number;   // 0–100
+  showLabels: boolean;
+}
+
+const DEFAULT_SETTINGS: GraphSettings = {
+  repulsion: 50,
+  nodeSize: 50,
+  linkWidth: 50,
+  showLabels: false,
+};
+
+function loadSettings(): GraphSettings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return DEFAULT_SETTINGS;
+    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+function persistSettings(s: GraphSettings): void {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+}
+
+// 0 → charge -100 (dense), 50 → -400 (default), 100 → -700 (sparse)
+function sliderToCharge(v: number): number {
+  return -100 - (v / 100) * 600;
+}
+
+// 0 → distance 60, 50 → 120 (default), 100 → 180
+function sliderToLinkDist(v: number): number {
+  return 60 + (v / 100) * 120;
+}
+
+// 0 → ×0.33, 50 → ×1.0 (default), 100 → ×1.67
+function sliderToMult(v: number): number {
+  return (v + 25) / 75;
+}
+
 // ── Canvas helpers ────────────────────────────────────────────────────────────
 
 function nodeColor(n: FGNode): string {
   if (n.type === "self") return "#9f67ff";
   const s = n.strength;
-  if (s >= 0.8) return "#ddd6fe"; // очень яркий фиолетовый
-  if (s >= 0.6) return "#a78bfa"; // purple-l
-  if (s >= 0.4) return "#7c3aed"; // purple
-  if (s >= 0.2) return "#6d28d9"; // purple-d
+  if (s >= 0.8) return "#ddd6fe";
+  if (s >= 0.6) return "#a78bfa";
+  if (s >= 0.4) return "#7c3aed";
+  if (s >= 0.2) return "#6d28d9";
   return "#5b21b6";
 }
 
 function nodeRadius(n: FGNode): number {
   if (n.type === "self") return 20;
-  return 5 + n.strength * 12; // от 5 до 17
+  return 5 + n.strength * 12; // 5–17
 }
 
 function linkColor(l: FGLink): string {
@@ -57,9 +104,10 @@ export function NetworkPage() {
   const [graphData, setGraphData] = useState<NetworkGraphType | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedNode, setSelectedNode] = useState<FGNode | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState<GraphSettings>(loadSettings);
 
   const graphContainerRef = useRef<HTMLDivElement>(null);
-  // Начинаем с 0 — рендерим ForceGraph только после ResizeObserver
   const [graphDims, setGraphDims] = useState({ width: 0, height: 0 });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fgRef = useRef<any>(null);
@@ -73,40 +121,43 @@ export function NetworkPage() {
       .finally(() => setLoading(false));
   }, [showToast]);
 
-  // Spread nodes apart: strong repulsion + longer link distance
+  // Apply repulsion / link distance — runs on data load and whenever slider changes
   useEffect(() => {
     if (!fgRef.current || !graphData) return;
-    fgRef.current.d3Force("charge")?.strength(-400);
-    fgRef.current.d3Force("link")?.distance(120);
+    fgRef.current.d3Force("charge")?.strength(sliderToCharge(settings.repulsion));
+    fgRef.current.d3Force("link")?.distance(sliderToLinkDist(settings.repulsion));
     fgRef.current.d3ReheatSimulation();
-  }, [graphData]);
+  }, [graphData, settings.repulsion]);
 
-  // Measure container for ForceGraph2D dimensions.
-  // Depends on `loading`: the container div is only in the DOM after loading finishes
-  // (early return above keeps it unmounted), so we must re-run once loading is false.
+  // Measure container for ForceGraph2D dimensions
   useEffect(() => {
     const el = graphContainerRef.current;
     if (!el) return;
-    // Read size immediately — ResizeObserver may fire too late on first paint
     const immediate = el.getBoundingClientRect();
     if (immediate.width > 0 && immediate.height > 0) {
-      setGraphDims({
-        width: Math.floor(immediate.width),
-        height: Math.floor(immediate.height),
-      });
+      setGraphDims({ width: Math.floor(immediate.width), height: Math.floor(immediate.height) });
     }
     const obs = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect;
       if (rect && rect.width > 0 && rect.height > 0) {
-        setGraphDims({
-          width: Math.floor(rect.width),
-          height: Math.floor(rect.height),
-        });
+        setGraphDims({ width: Math.floor(rect.width), height: Math.floor(rect.height) });
       }
     });
     obs.observe(el);
     return () => obs.disconnect();
   }, [loading]);
+
+  // Settings updater — saves to localStorage
+  const updateSetting = useCallback(
+    <K extends keyof GraphSettings>(key: K, value: GraphSettings[K]) => {
+      setSettings((prev) => {
+        const next = { ...prev, [key]: value };
+        persistSettings(next);
+        return next;
+      });
+    },
+    [],
+  );
 
   // ── ForceGraph2D callbacks ───────────────────────────────────────────────────
 
@@ -129,10 +180,10 @@ export function NetworkPage() {
       const n = node as FGNode;
       const x = n.x ?? 0;
       const y = n.y ?? 0;
-      const r = nodeRadius(n);
+      const r = nodeRadius(n) * sliderToMult(settings.nodeSize);
       const fill = nodeColor(n);
 
-      // Glow — чем сильнее связь, тем ярче и больше свечение
+      // Glow
       if (n.type === "self") {
         ctx.shadowBlur = 30;
         ctx.shadowColor = "#9f67ff";
@@ -157,8 +208,6 @@ export function NetworkPage() {
       ctx.arc(x, y, r, 0, 2 * Math.PI);
       ctx.fillStyle = fill;
       ctx.fill();
-
-      // Reset shadow
       ctx.shadowBlur = 0;
 
       // Letter inside large enough nodes
@@ -169,21 +218,35 @@ export function NetworkPage() {
         ctx.fillStyle = "rgba(255,255,255,0.9)";
         ctx.fillText(n.label.charAt(0).toUpperCase(), x, y);
       }
+
+      // Full label below node when enabled
+      if (settings.showLabels) {
+        const fontSize = Math.max(9, Math.min(12, r * 0.55));
+        ctx.font = `${fontSize}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillStyle = "rgba(240,238,255,0.75)";
+        ctx.fillText(n.label, x, y + r + 3);
+      }
     },
-    [],
+    [settings.nodeSize, settings.showLabels],
   );
 
   const nodePointerAreaPaint = useCallback(
     (node: object, color: string, ctx: CanvasRenderingContext2D) => {
       const n = node as FGNode;
-      const x = n.x ?? 0;
-      const y = n.y ?? 0;
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(x, y, nodeRadius(n) + 4, 0, 2 * Math.PI);
+      ctx.arc(
+        n.x ?? 0,
+        n.y ?? 0,
+        nodeRadius(n) * sliderToMult(settings.nodeSize) + 4,
+        0,
+        2 * Math.PI,
+      );
       ctx.fill();
     },
-    [],
+    [settings.nodeSize],
   );
 
   const getLinkColor = useCallback(
@@ -191,10 +254,13 @@ export function NetworkPage() {
     [],
   );
 
-  const getLinkWidth = useCallback((link: object) => {
-    const l = link as FGLink;
-    return 0.5 + l.strength * 4; // 0.5 (слабая) → 4.5 (очень сильная)
-  }, []);
+  const getLinkWidth = useCallback(
+    (link: object) => {
+      const l = link as FGLink;
+      return (0.5 + l.strength * 4) * sliderToMult(settings.linkWidth);
+    },
+    [settings.linkWidth],
+  );
 
   const getLinkParticleWidth = useCallback((link: object) => {
     const l = link as FGLink;
@@ -204,11 +270,11 @@ export function NetworkPage() {
   }, []);
 
   const handleNodeClick = useCallback((node: object) => {
+    setSettingsOpen(false);
     setSelectedNode(node as FGNode);
   }, []);
 
   const handleEngineStop = useCallback(() => {
-    // Зум чтобы граф заполнил пространство с отступами по краям
     fgRef.current?.zoomToFit(400, 48);
   }, []);
 
@@ -254,16 +320,62 @@ export function NetworkPage() {
         <div>
           <span style={{ fontWeight: 700, fontSize: 16 }}>Мои связи</span>
           {graphData && (
-            <span
-              style={{ fontSize: 12, color: "var(--text2)", marginLeft: 8 }}
-            >
+            <span style={{ fontSize: 12, color: "var(--text2)", marginLeft: 8 }}>
               {contactCount} контактов
             </span>
           )}
         </div>
+
+        {/* Settings button */}
+        {hasContacts && (
+          <button
+            onClick={() => {
+              setSelectedNode(null);
+              setSettingsOpen(true);
+            }}
+            style={{
+              background: settingsOpen
+                ? "rgba(124,58,237,0.2)"
+                : "rgba(255,255,255,0.04)",
+              border: "1px solid var(--purple-border)",
+              borderRadius: 8,
+              color: settingsOpen ? "var(--purple-l)" : "var(--text2)",
+              padding: "6px 10px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              fontSize: 13,
+              fontWeight: 500,
+              transition: "background 0.15s, color 0.15s",
+              WebkitTapHighlightColor: "transparent",
+            }}
+            aria-label="Настройки графа"
+          >
+            {/* Sliders icon */}
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="4" y1="6" x2="20" y2="6" />
+              <line x1="4" y1="12" x2="20" y2="12" />
+              <line x1="4" y1="18" x2="20" y2="18" />
+              <circle cx="8" cy="6" r="2" fill="currentColor" stroke="none" />
+              <circle cx="15" cy="12" r="2" fill="currentColor" stroke="none" />
+              <circle cx="10" cy="18" r="2" fill="currentColor" stroke="none" />
+            </svg>
+            Вид
+          </button>
+        )}
       </div>
 
-      {/* Graph area — заполняет всё доступное место; nav fixed, перекрывает снизу */}
+      {/* Graph area */}
       <div
         ref={graphContainerRef}
         style={{
@@ -474,6 +586,141 @@ export function NetworkPage() {
           </div>
         </div>
       )}
+
+      {/* Graph settings bottom sheet */}
+      {settingsOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            zIndex: 200,
+            display: "flex",
+            alignItems: "flex-end",
+          }}
+          onClick={() => setSettingsOpen(false)}
+        >
+          <div
+            style={{
+              background: "var(--bg-card)",
+              borderRadius: "20px 20px 0 0",
+              border: "1px solid var(--purple-border)",
+              padding: "16px 20px",
+              paddingBottom: "calc(var(--nav-total) + 20px)",
+              width: "100%",
+              maxHeight: "80vh",
+              overflow: "auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drag handle */}
+            <div
+              style={{
+                width: 36,
+                height: 4,
+                background: "var(--text3)",
+                borderRadius: 2,
+                margin: "0 auto 20px",
+              }}
+            />
+
+            {/* Title */}
+            <div
+              style={{
+                fontWeight: 700,
+                fontSize: 17,
+                marginBottom: 24,
+                color: "var(--text)",
+              }}
+            >
+              Настройки графа
+            </div>
+
+            {/* Sliders */}
+            <SettingSlider
+              label="Плотность связей"
+              value={settings.repulsion}
+              onChange={(v) => updateSetting("repulsion", v)}
+            />
+            <SettingSlider
+              label="Размер узлов"
+              value={settings.nodeSize}
+              onChange={(v) => updateSetting("nodeSize", v)}
+            />
+            <SettingSlider
+              label="Толщина рёбер"
+              value={settings.linkWidth}
+              onChange={(v) => updateSetting("linkWidth", v)}
+            />
+
+            <div className="divider" />
+
+            {/* Show labels toggle */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "4px 0 20px",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 14, color: "var(--text)", fontWeight: 500 }}>
+                  Показывать подписи
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
+                  Имена контактов под узлами
+                </div>
+              </div>
+              <button
+                onClick={() => updateSetting("showLabels", !settings.showLabels)}
+                style={{
+                  width: 50,
+                  height: 28,
+                  borderRadius: 14,
+                  background: settings.showLabels
+                    ? "var(--purple)"
+                    : "rgba(255,255,255,0.1)",
+                  border: "none",
+                  cursor: "pointer",
+                  position: "relative",
+                  transition: "background 0.2s",
+                  flexShrink: 0,
+                  WebkitTapHighlightColor: "transparent",
+                }}
+                aria-label="Переключить подписи"
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 3,
+                    left: settings.showLabels ? 25 : 3,
+                    width: 22,
+                    height: 22,
+                    borderRadius: "50%",
+                    background: "#fff",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.35)",
+                    transition: "left 0.2s",
+                    display: "block",
+                  }}
+                />
+              </button>
+            </div>
+
+            {/* Reset button */}
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                const defaults = { ...DEFAULT_SETTINGS };
+                setSettings(defaults);
+                persistSettings(defaults);
+              }}
+            >
+              Сбросить настройки
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -491,6 +738,58 @@ function InfoRow({ label, value }: { label: string; value: string | number }) {
     >
       <span style={{ color: "var(--text2)", fontSize: 14 }}>{label}</span>
       <span style={{ fontWeight: 600, fontSize: 14 }}>{value}</span>
+    </div>
+  );
+}
+
+function SettingSlider({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const pct = value; // value is already 0–100
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          marginBottom: 10,
+        }}
+      >
+        <span style={{ fontSize: 14, color: "var(--text)", fontWeight: 500 }}>
+          {label}
+        </span>
+        <span
+          style={{
+            fontSize: 13,
+            color: "var(--purple-l)",
+            fontWeight: 600,
+            minWidth: 28,
+            textAlign: "right",
+          }}
+        >
+          {value}
+        </span>
+      </div>
+      <div className="slider-wrap">
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          style={{
+            background: `linear-gradient(to right, var(--purple-l) 0%, var(--purple-l) ${pct}%, var(--bg-card2) ${pct}%, var(--bg-card2) 100%)`,
+          }}
+        />
+      </div>
     </div>
   );
 }
