@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Tariff } from '@/entities/tariff'
-import { getTariffs } from '@/entities/tariff'
+import { getTariffs, getTributeUrl } from '@/entities/tariff'
 import { BuyButton } from '@/features/buy-subscription'
 import { useApp } from '@/app/AppContext'
 
@@ -45,9 +45,14 @@ export function SubscriptionPage() {
   const navigate = useNavigate()
   const [tariffs, setTariffs] = useState<Tariff[]>([])
   const [loading, setLoading] = useState(true)
+  const [tributeUrl, setTributeUrl] = useState<string | null>(null)
 
   useEffect(() => {
     getTariffs().then(r => setTariffs(r.data)).finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    getTributeUrl().then(setTributeUrl)
   }, [])
 
   return (
@@ -95,6 +100,29 @@ export function SubscriptionPage() {
         )}
 
         <div className="divider" />
+
+        {tributeUrl && (
+          <>
+            <div className="text-sm text2 mb-12" style={{ marginTop: 20 }}>Оплата через СБП</div>
+            <button
+              className="btn"
+              style={{ background: 'linear-gradient(135deg, #1a73e8, #0d5dbf)', marginBottom: 12 }}
+              onClick={() => {
+                const tg = window.Telegram?.WebApp
+                if (tg?.openLink) {
+                  tg.openLink(tributeUrl)
+                } else {
+                  window.open(tributeUrl, '_blank')
+                }
+              }}
+            >
+              🏦 Оплатить через СБП
+            </button>
+            <div className="text-xs text3" style={{ textAlign: 'center', marginBottom: 16 }}>
+              Оплата через Tribute — без комиссии за конвертацию
+            </div>
+          </>
+        )}
 
         <button className="btn btn-secondary" onClick={() => navigate('/activate')}>
           🎟 Активировать промокод

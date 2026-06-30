@@ -19,6 +19,7 @@ def admin_main(is_superadmin: bool) -> InlineKeyboardMarkup:
     kb.button(text="🤝 Рефералы", callback_data="a:referral")
     kb.button(text="📹 Курс для пользователей", callback_data="a:course")
     kb.button(text="💬 Подначивания", callback_data="a:nudge")
+    kb.button(text="🏦 Tribute СБП", callback_data="a:tribute_settings")
     if is_superadmin:
         kb.button(text="👮 Управление админами", callback_data="a:admins")
         kb.button(text="⚙️ Настройки очистки", callback_data="a:cleanup")
@@ -92,6 +93,21 @@ def referral_kb() -> InlineKeyboardMarkup:
     kb.button(text="✏️ Изменить кол-во дней", callback_data="a:referral_edit")
     kb.button(text="⬅️ В админку", callback_data="a:main")
     kb.adjust(1)
+    return kb.as_markup()
+
+
+def tribute_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="✏️ Изменить URL", callback_data="a:tribute_set_url")
+    kb.button(text="🗑 Сбросить", callback_data="a:tribute_clear_url")
+    kb.button(text="⬅️ В админку", callback_data="a:main")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def tribute_set_url_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="⬅️ Отмена", callback_data="a:tribute_settings")
     return kb.as_markup()
 
 

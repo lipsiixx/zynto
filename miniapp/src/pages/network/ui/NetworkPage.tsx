@@ -31,8 +31,8 @@ function nodeColor(n: FGNode): string {
   if (s >= 0.8) return "#ddd6fe"; // очень яркий фиолетовый
   if (s >= 0.6) return "#a78bfa"; // purple-l
   if (s >= 0.4) return "#7c3aed"; // purple
-  if (s >= 0.2) return "#4c1d95"; // purple-d
-  return "#2d1b6e";
+  if (s >= 0.2) return "#6d28d9"; // purple-d
+  return "#5b21b6";
 }
 
 function nodeRadius(n: FGNode): number {
@@ -45,8 +45,8 @@ function linkColor(l: FGLink): string {
   if (s >= 0.8) return "rgba(221,214,254,0.85)";
   if (s >= 0.6) return "rgba(167,139,250,0.75)";
   if (s >= 0.4) return "rgba(124,58,237,0.55)";
-  if (s >= 0.2) return "rgba(76,29,149,0.4)";
-  return "rgba(90,82,114,0.2)";
+  if (s >= 0.2) return "rgba(109,40,217,0.55)";
+  return "rgba(91,33,182,0.45)";
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -135,6 +135,12 @@ export function NetworkPage() {
       } else if (n.strength >= 0.4) {
         ctx.shadowBlur = 10;
         ctx.shadowColor = "#7c3aed";
+      } else if (n.strength >= 0.2) {
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = "#6d28d9";
+      } else {
+        ctx.shadowBlur = 3;
+        ctx.shadowColor = "#5b21b6";
       }
 
       ctx.beginPath();

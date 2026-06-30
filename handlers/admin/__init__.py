@@ -14,6 +14,7 @@ from . import (
     server,
     stats,
     tariffs,
+    tribute_settings,
     users_mgmt,
 )
 
@@ -33,4 +34,5 @@ def get_admin_router() -> Router:
     router.include_router(referral.router)
     router.include_router(course.router)
     router.include_router(nudge.router)
+    router.include_router(tribute_settings.router)
     return router

@@ -73,3 +73,7 @@ class NudgeStates(StatesGroup):
     waiting_edit_text = State()  # редактирование существующего
     waiting_interval = State()   # изменение периодичности
     waiting_grace = State()      # изменение порога (дней после истечения)
+
+
+class TributeSettingsStates(StatesGroup):
+    waiting_url = State()

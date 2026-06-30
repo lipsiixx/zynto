@@ -678,6 +678,16 @@ async def webapp_media(
     )
 
 
+@router.get("/tribute-url")
+async def webapp_tribute_url(
+    _: int = Depends(_require_webapp_auth),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """URL страницы оплаты через Tribute (СБП). Null если не настроен."""
+    url = await settings_q.get_setting(db, "tribute_payment_url")
+    return {"url": url}
+
+
 # ── Network endpoints ─────────────────────────────────────────────────────
 
 @router.get("/network/status")

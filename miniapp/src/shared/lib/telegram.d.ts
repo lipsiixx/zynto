@@ -39,6 +39,7 @@ interface TelegramWebApp {
   ready(): void
   expand(): void
   close(): void
+  openLink(url: string, options?: { try_instant_view?: boolean }): void
   onEvent(eventType: string, handler: () => void): void
   offEvent(eventType: string, handler: () => void): void
   BackButton: {
