@@ -161,6 +161,7 @@ class MessageLog(Base):
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     is_edited: Mapped[bool] = mapped_column(Boolean, default=False)
     edit_count: Mapped[int] = mapped_column(Integer, default=0)
+    is_view_once: Mapped[bool] = mapped_column(Boolean, default=False)
 
     received_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
     deleted_at: Mapped[datetime | None] = mapped_column(_ts())

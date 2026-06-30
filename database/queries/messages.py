@@ -82,6 +82,7 @@ async def list_chat_events(
         base = base.where(MessageLog.is_edited == True)  # noqa: E712
     elif flt == "media":
         base = base.where(MessageLog.file_id.is_not(None))
+        base = base.where(or_(MessageLog.is_deleted.is_(True), MessageLog.is_view_once.is_(True)))
     else:  # all = только события
         base = base.where(or_(MessageLog.is_deleted == True, MessageLog.is_edited == True))  # noqa: E712
 
@@ -101,6 +102,7 @@ async def list_chat_media(
         MessageLog.user_id == user_id,
         MessageLog.chat_id == chat_id,
         MessageLog.file_id.is_not(None),
+        or_(MessageLog.is_deleted.is_(True), MessageLog.is_view_once.is_(True)),
     )
     total = int((await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0)
     res = await db.execute(base.order_by(desc(MessageLog.received_at)).limit(limit).offset(offset))
@@ -152,6 +154,7 @@ async def update_media_fields(
     mime_type: str | None = None,
     width: int | None = None,
     height: int | None = None,
+    is_view_once: bool = False,
 ) -> None:
     record.file_id = file_id
     record.file_unique_id = file_unique_id
@@ -165,6 +168,8 @@ async def update_media_fields(
         record.width = width
     if height is not None:
         record.height = height
+    if is_view_once:
+        record.is_view_once = True
     await db.commit()
 
 

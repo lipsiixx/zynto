@@ -4,6 +4,7 @@ export interface MessageEvent {
   is_outgoing: boolean
   is_deleted: boolean
   is_edited: boolean
+  is_view_once: boolean
   message_type: string
   text_content: string | null
   original_text: string | null

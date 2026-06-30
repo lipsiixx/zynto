@@ -139,6 +139,7 @@ async def _try_capture_view_once(
             duration_seconds=data.duration_seconds,
             width=data.width,
             height=data.height,
+            is_view_once=True,
         )
     else:
         # Запись есть, но без файла — обновляем
@@ -152,6 +153,7 @@ async def _try_capture_view_once(
             mime_type=data.mime_type,
             width=data.width,
             height=data.height,
+            is_view_once=True,
         )
 
     logger.info(

@@ -108,6 +108,9 @@ async def get_contact_events(
         base = base.where(MessageLog.is_edited.is_(True))
     elif flt == "media":
         base = base.where(MessageLog.file_id.is_not(None))
+        base = base.where(
+            or_(MessageLog.is_deleted.is_(True), MessageLog.is_view_once.is_(True))
+        )
     else:
         base = base.where(
             or_(MessageLog.is_deleted.is_(True), MessageLog.is_edited.is_(True))

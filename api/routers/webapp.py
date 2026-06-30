@@ -206,6 +206,7 @@ async def webapp_contact_events(
             "is_outgoing": e.is_outgoing,
             "is_deleted": e.is_deleted,
             "is_edited": e.is_edited,
+            "is_view_once": e.is_view_once,
             "message_type": e.message_type,
             "text_content": e.text_content,
             "original_text": e.original_text,
