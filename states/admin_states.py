@@ -77,3 +77,9 @@ class NudgeStates(StatesGroup):
 
 class TributeSettingsStates(StatesGroup):
     waiting_days = State()
+
+
+class AboutSettingsStates(StatesGroup):
+    waiting_privacy_content = State()
+    waiting_terms_content = State()
+    waiting_support_url = State()

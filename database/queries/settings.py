@@ -82,3 +82,19 @@ async def ensure_defaults(db: AsyncSession) -> None:
         await set_setting(db, "nudge_interval_days", "1")
     if await get_setting(db, "nudge_grace_days") is None:
         await set_setting(db, "nudge_grace_days", "3")
+    if await get_setting(db, "about_privacy_enabled") is None:
+        await set_setting(db, "about_privacy_enabled", "1")
+    if await get_setting(db, "about_privacy_type") is None:
+        await set_setting(db, "about_privacy_type", "text")
+    if await get_setting(db, "about_privacy_content") is None:
+        await set_setting(db, "about_privacy_content", "")
+    if await get_setting(db, "about_terms_enabled") is None:
+        await set_setting(db, "about_terms_enabled", "1")
+    if await get_setting(db, "about_terms_type") is None:
+        await set_setting(db, "about_terms_type", "text")
+    if await get_setting(db, "about_terms_content") is None:
+        await set_setting(db, "about_terms_content", "")
+    if await get_setting(db, "about_support_enabled") is None:
+        await set_setting(db, "about_support_enabled", "1")
+    if await get_setting(db, "about_support_url") is None:
+        await set_setting(db, "about_support_url", "")

@@ -31,6 +31,7 @@ def main_menu(subscribed: bool = True, connected: bool = False) -> InlineKeyboar
     kb.button(text="📋 Как подключить", callback_data="how_connect")
     if not subscribed:
         kb.button(text="❓ Как это работает", callback_data="how")
+    kb.button(text="ℹ️ О боте", callback_data="about")
     kb.adjust(1)
     _add_stars_premium(kb)
     return kb.as_markup()

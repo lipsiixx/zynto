@@ -2,6 +2,7 @@
 from aiogram import Router
 
 from . import (
+    about_settings,
     admins_mgmt,
     broadcast,
     cleanup,
@@ -35,4 +36,5 @@ def get_admin_router() -> Router:
     router.include_router(course.router)
     router.include_router(nudge.router)
     router.include_router(tribute_settings.router)
+    router.include_router(about_settings.router)
     return router

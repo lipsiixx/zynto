@@ -20,6 +20,7 @@ def admin_main(is_superadmin: bool) -> InlineKeyboardMarkup:
     kb.button(text="📹 Курс для пользователей", callback_data="a:course")
     kb.button(text="💬 Подначивания", callback_data="a:nudge")
     kb.button(text="🏦 Tribute СБП", callback_data="a:tribute_settings")
+    kb.button(text="ℹ️ О боте", callback_data="a:about")
     if is_superadmin:
         kb.button(text="👮 Управление админами", callback_data="a:admins")
         kb.button(text="⚙️ Настройки очистки", callback_data="a:cleanup")
@@ -274,6 +275,57 @@ def nudge_msg_kb(msg_id: int, is_active: bool, has_media: bool = False) -> Inlin
     kb.button(text="🗑 Удалить", callback_data=f"a:nudge_del:{msg_id}")
     kb.button(text="⬅️ К списку", callback_data="a:nudge_msgs")
     kb.adjust(1)
+    return kb.as_markup()
+
+
+def about_main_kb(
+    privacy_en: bool,
+    privacy_type: str,
+    terms_en: bool,
+    terms_type: str,
+    support_en: bool,
+) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+
+    p_icon = "✅" if privacy_en else "❌"
+    kb.row(InlineKeyboardButton(
+        text=f"{p_icon} Политика конфиденциальности",
+        callback_data="a:about:privacy:toggle",
+    ))
+    if privacy_en:
+        p_type_label = "🔗 Тип: URL" if privacy_type == "url" else "📄 Тип: Текст"
+        kb.row(
+            InlineKeyboardButton(text=p_type_label, callback_data="a:about:privacy:type"),
+            InlineKeyboardButton(text="✏️ Изменить", callback_data="a:about:privacy:edit"),
+        )
+
+    t_icon = "✅" if terms_en else "❌"
+    kb.row(InlineKeyboardButton(
+        text=f"{t_icon} Пользовательское соглашение",
+        callback_data="a:about:terms:toggle",
+    ))
+    if terms_en:
+        t_type_label = "🔗 Тип: URL" if terms_type == "url" else "📄 Тип: Текст"
+        kb.row(
+            InlineKeyboardButton(text=t_type_label, callback_data="a:about:terms:type"),
+            InlineKeyboardButton(text="✏️ Изменить", callback_data="a:about:terms:edit"),
+        )
+
+    s_icon = "✅" if support_en else "❌"
+    kb.row(InlineKeyboardButton(
+        text=f"{s_icon} Поддержка",
+        callback_data="a:about:support:toggle",
+    ))
+    if support_en:
+        kb.row(InlineKeyboardButton(text="✏️ Изменить ссылку", callback_data="a:about:support:edit"))
+
+    kb.row(InlineKeyboardButton(text="⬅️ В админку", callback_data="a:main"))
+    return kb.as_markup()
+
+
+def about_edit_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="⬅️ К настройкам О боте", callback_data="a:about")
     return kb.as_markup()
 
 
