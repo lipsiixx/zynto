@@ -98,7 +98,8 @@ def referral_kb() -> InlineKeyboardMarkup:
 
 def tribute_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text="✏️ Изменить URL", callback_data="a:tribute_set_url")
+    kb.button(text="🔄 Загрузить из Tribute", callback_data="a:tribute_load_products")
+    kb.button(text="✏️ Изменить URL вручную", callback_data="a:tribute_set_url")
     kb.button(text="🗑 Сбросить", callback_data="a:tribute_clear_url")
     kb.button(text="⬅️ В админку", callback_data="a:main")
     kb.adjust(1)
@@ -108,6 +109,18 @@ def tribute_kb() -> InlineKeyboardMarkup:
 def tribute_set_url_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="⬅️ Отмена", callback_data="a:tribute_settings")
+    return kb.as_markup()
+
+
+def tribute_products_kb(products: list[dict]) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    for i, p in enumerate(products):
+        amount = p.get("amount", 0) / 100
+        currency = p.get("currency", "")
+        name = p.get("name", "Без названия")
+        kb.button(text=f"{name} — {amount:g} {currency}", callback_data=f"a:tribute_pick:{i}")
+    kb.adjust(1)
+    kb.row(InlineKeyboardButton(text="⬅️ Отмена", callback_data="a:tribute_settings"))
     return kb.as_markup()
 
 
