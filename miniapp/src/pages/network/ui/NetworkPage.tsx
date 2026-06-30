@@ -51,18 +51,43 @@ function loadSettings(): GraphSettings {
   }
 }
 
+function parseStoredSettings(raw: string | null | undefined): GraphSettings | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return { ...DEFAULT_SETTINGS, ...parsed };
+  } catch {
+    return null;
+  }
+}
+
 function persistSettings(s: GraphSettings): void {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  const raw = JSON.stringify(s);
+  try {
+    localStorage.setItem(SETTINGS_KEY, raw);
+  } catch {
+    // ignore — localStorage may be unavailable
+  }
+  // Also persist to Telegram CloudStorage (survives full app close/reopen,
+  // unlike localStorage which can be wiped in Telegram's WebView).
+  try {
+    const cloud =
+      typeof window !== "undefined" ? window.Telegram?.WebApp?.CloudStorage : undefined;
+    cloud?.setItem(SETTINGS_KEY, raw);
+  } catch {
+    // ignore — CloudStorage unavailable (e.g. dev browser)
+  }
 }
 
-// 0 → charge -100 (dense), 50 → -400 (default), 100 → -700 (sparse)
+// 0 → charge -700 (sparse), 50 → -400 (default), 100 → -100 (dense)
 function sliderToCharge(v: number): number {
-  return -100 - (v / 100) * 600;
+  return -700 + (v / 100) * 600;
 }
 
-// 0 → distance 60, 50 → 120 (default), 100 → 180
+// 0 → distance 180, 50 → 120 (default), 100 → 60
 function sliderToLinkDist(v: number): number {
-  return 60 + (v / 100) * 120;
+  return 180 - (v / 100) * 120;
 }
 
 // 0 → ×0.33, 50 → ×1.0 (default), 100 → ×1.67
@@ -120,6 +145,26 @@ export function NetworkPage() {
       .catch(() => showToast("Ошибка загрузки графа", "error"))
       .finally(() => setLoading(false));
   }, [showToast]);
+
+  // On mount: localStorage may be wiped by Telegram's WebView between app
+  // launches, so re-check CloudStorage (synced to the user's Telegram
+  // account) and apply it once it resolves, if it differs from what's
+  // already loaded synchronously.
+  useEffect(() => {
+    try {
+      const cloud =
+        typeof window !== "undefined" ? window.Telegram?.WebApp?.CloudStorage : undefined;
+      if (!cloud) return;
+      cloud.getItem(SETTINGS_KEY, (error, value) => {
+        if (error) return;
+        const parsed = parseStoredSettings(value);
+        if (!parsed) return;
+        setSettings(parsed);
+      });
+    } catch {
+      // ignore — CloudStorage unavailable (e.g. dev browser)
+    }
+  }, []);
 
   // Apply repulsion / link distance — runs on data load and whenever slider changes
   useEffect(() => {
