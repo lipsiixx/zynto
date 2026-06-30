@@ -81,10 +81,20 @@ export function NetworkPage() {
     fgRef.current.d3ReheatSimulation();
   }, [graphData]);
 
-  // Measure container for ForceGraph2D dimensions
+  // Measure container for ForceGraph2D dimensions.
+  // Depends on `loading`: the container div is only in the DOM after loading finishes
+  // (early return above keeps it unmounted), so we must re-run once loading is false.
   useEffect(() => {
     const el = graphContainerRef.current;
     if (!el) return;
+    // Read size immediately — ResizeObserver may fire too late on first paint
+    const immediate = el.getBoundingClientRect();
+    if (immediate.width > 0 && immediate.height > 0) {
+      setGraphDims({
+        width: Math.floor(immediate.width),
+        height: Math.floor(immediate.height),
+      });
+    }
     const obs = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect;
       if (rect && rect.width > 0 && rect.height > 0) {
@@ -96,7 +106,7 @@ export function NetworkPage() {
     });
     obs.observe(el);
     return () => obs.disconnect();
-  }, []);
+  }, [loading]);
 
   // ── ForceGraph2D callbacks ───────────────────────────────────────────────────
 
