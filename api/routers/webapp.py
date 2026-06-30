@@ -24,6 +24,7 @@ from database.queries import business as biz_q
 from database.queries import mutual_rating as mr_q
 from database.queries import promo_codes as promo_q
 from database.queries import settings as settings_q
+from database.queries import subscriptions as subs_q
 from database.queries import tariffs as tariffs_q
 from database.queries import users as users_q
 from database.queries import webapp as webapp_q
@@ -145,6 +146,12 @@ async def webapp_me(
     if user.subscription_expires_at:
         expires_at = user.subscription_expires_at.isoformat()
 
+    started_at = None
+    if has_sub and user.subscription_status == "active":
+        active_sub = await subs_q.get_active_subscription(db, user.telegram_id)
+        if active_sub and active_sub.started_at:
+            started_at = active_sub.started_at.isoformat()
+
     return {
         "telegram_id": user.telegram_id,
         "full_name": user.full_name,
@@ -154,6 +161,7 @@ async def webapp_me(
             "status": user.subscription_status,
             "has_active": has_sub,
             "expires_at": expires_at,
+            "started_at": started_at,
         },
         "monitoring_active": conn is not None,
         "summary": summary,

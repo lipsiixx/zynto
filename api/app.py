@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from api import auth, ws
-from api.routers import cache, chats, graph, media, stats, users, webapp
+from api.routers import cache, chats, graph, media, stats, tribute, users, webapp
 
 app = FastAPI(
     title="Zynto Bot API",
@@ -47,6 +47,7 @@ app.include_router(stats.router, prefix=PREFIX)
 app.include_router(graph.router, prefix=PREFIX)
 app.include_router(cache.router, prefix=PREFIX)
 app.include_router(webapp.router, prefix=PREFIX)
+app.include_router(tribute.router, prefix=PREFIX)
 
 
 @app.get("/v1/health")

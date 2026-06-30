@@ -107,6 +107,9 @@ class Settings:
     # URL мини-апп для кнопки WebApp в боте (например https://yourdomain.com/miniapp)
     miniapp_url: str = field(default_factory=lambda: os.getenv("MINIAPP_URL", ""))
 
+    # HMAC-ключ вебхука Tribute (СБП-оплата): заголовок trbt-signature = HMAC-SHA256(body, tribute_api_key)
+    tribute_api_key: str = field(default_factory=lambda: os.getenv("TRIBUTE_API_KEY", ""))
+
     @property
     def max_file_size_bytes(self) -> int:
         return self.max_file_size_mb * 1024 * 1024
