@@ -110,6 +110,15 @@ class Settings:
     # HMAC-ключ вебхука Tribute (СБП-оплата): заголовок trbt-signature = HMAC-SHA256(body, tribute_api_key)
     tribute_api_key: str = field(default_factory=lambda: os.getenv("TRIBUTE_API_KEY", ""))
 
+    # Канал, на который обязана быть подписка пользователя (без @). Бот должен
+    # состоять в нём участником (лучше — админом), иначе get_chat_member всегда
+    # fail-open (пропускает всех, см. services/channel_sub.py).
+    required_channel: str = field(default_factory=lambda: os.getenv("REQUIRED_CHANNEL", "zyntobotoficalchannel"))
+
+    @property
+    def required_channel_url(self) -> str:
+        return f"https://t.me/{self.required_channel}"
+
     @property
     def max_file_size_bytes(self) -> int:
         return self.max_file_size_mb * 1024 * 1024

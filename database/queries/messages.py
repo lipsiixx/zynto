@@ -22,6 +22,11 @@ async def find_message(
     return res.scalars().first()
 
 
+async def get_by_id(db: AsyncSession, record_id: int) -> MessageLog | None:
+    res = await db.execute(select(MessageLog).where(MessageLog.id == record_id))
+    return res.scalars().first()
+
+
 async def save_message(db: AsyncSession, **fields) -> MessageLog:
     record = MessageLog(**fields)
     db.add(record)

@@ -25,8 +25,10 @@ from handlers.business import get_business_router
 from handlers.user import get_user_router
 from middlewares.admin_check import AdminCheckMiddleware
 from middlewares.auth import AuthMiddleware
+from middlewares.channel_sub import ChannelSubscriptionMiddleware
 from middlewares.database import DatabaseMiddleware
 from middlewares.throttle import ThrottleMiddleware
+from services import channel_sub
 from services import cleaner, media
 from services import notifier as notifier_module
 from services import proxy_monitor as proxy_monitor_module
@@ -94,9 +96,12 @@ def setup_middlewares(dp: Dispatcher, user_router, admin_router, redis: Redis | 
     # database — внешний middleware для всех апдейтов
     dp.update.outer_middleware(DatabaseMiddleware())
 
-    # auth + throttle — только для пользовательских апдейтов
+    # auth + channel_sub + throttle — только для пользовательских апдейтов.
+    # channel_sub идёт после auth (нужен data["user"]) и до throttle.
     user_router.message.middleware(AuthMiddleware())
     user_router.callback_query.middleware(AuthMiddleware())
+    user_router.message.middleware(ChannelSubscriptionMiddleware())
+    user_router.callback_query.middleware(ChannelSubscriptionMiddleware())
     user_router.message.middleware(ThrottleMiddleware(redis))
     user_router.callback_query.middleware(ThrottleMiddleware(redis))
 
@@ -211,6 +216,8 @@ async def main() -> None:
         logger.warning(
             "Redis недоступен (%s). FSM в памяти, throttle отключён.", exc)
         redis = None
+
+    channel_sub.set_redis(redis)
 
     # Прокси (SOCKS5/HTTP) для обхода блокировки Telegram. Выбираем первый рабочий
     # из списка (proxies.txt / TELEGRAM_PROXY). Если список пуст — напрямую.

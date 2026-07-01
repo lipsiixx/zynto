@@ -150,3 +150,17 @@ def nudge_kb() -> InlineKeyboardMarkup:
     kb.adjust(1)
     _add_stars_premium(kb)
     return kb.as_markup()
+
+
+def require_channel_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(InlineKeyboardButton(text="📢 Подписаться", url=settings.required_channel_url))
+    kb.row(InlineKeyboardButton(text="✅ Я подписался", callback_data="checksub"))
+    return kb.as_markup()
+
+
+def locked_notification_kb(kind: str, record_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(InlineKeyboardButton(text="📢 Подписаться", url=settings.required_channel_url))
+    kb.row(InlineKeyboardButton(text="✅ Я подписался", callback_data=f"subchk:{kind}:{record_id}"))
+    return kb.as_markup()

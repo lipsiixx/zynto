@@ -19,6 +19,8 @@ from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
 from database.engine import SessionLocal
 from database.models import MessageLog
 from database.queries import users as users_q
+from keyboards.user_kb import locked_notification_kb
+from services import channel_sub
 from services import media as media_service
 from utils.formatters import esc, fmt_dt, truncate, type_label, user_mention
 
@@ -180,8 +182,7 @@ class Notifier:
         kind = job["kind"]
         target = job["target"]
         record: MessageLog = job["record"]
-        tag = self._sender_tag(record)
-        footer = await self._footer()
+        tag, footer = await self._build_tag_footer(record)
 
         if kind == "deleted":
             await self._send_deleted(target, record, tag, footer)
@@ -190,7 +191,37 @@ class Notifier:
         elif kind == "one_time":
             await self._send_one_time(target, record, tag, footer)
 
+    async def _build_tag_footer(self, record: MessageLog) -> tuple[str, str]:
+        return self._sender_tag(record), await self._footer()
+
+    async def reveal_edited(self, target_user_id: int, record: MessageLog) -> None:
+        """Безусловно показывает полное содержимое изменённого сообщения.
+
+        Вызывается после того, как вызывающий код (handlers/user/channel_sub.py)
+        уже подтвердил подписку пользователя на канал — здесь проверка не нужна.
+        """
+        tag, footer = await self._build_tag_footer(record)
+        await self._send_edited_full(target_user_id, record, tag, footer)
+
+    async def reveal_deleted(self, target_user_id: int, record: MessageLog) -> None:
+        """Безусловно показывает полное содержимое удалённого сообщения (см. reveal_edited)."""
+        tag, footer = await self._build_tag_footer(record)
+        await self._send_deleted_full(target_user_id, record, tag, footer)
+
     async def _send_deleted(self, target: int, record: MessageLog, tag: str, footer: str) -> None:
+        if not await channel_sub.is_subscribed(self.bot, target):
+            when_del = fmt_dt(record.deleted_at)
+            text = (
+                f"🟣 <b>Удалено сообщение</b> 🔮\n\n"
+                f"👤 <b>Кто:</b> {tag}\n"
+                f"🗑 <b>Удалено:</b> {when_del}\n\n"
+                f"🔒 Содержимое скрыто. Подпишитесь на канал, чтобы увидеть удалённое сообщение."
+            )
+            await self.bot.send_message(target, text, reply_markup=locked_notification_kb("deleted", record.id))
+            return
+        await self._send_deleted_full(target, record, tag, footer)
+
+    async def _send_deleted_full(self, target: int, record: MessageLog, tag: str, footer: str) -> None:
         when_del = fmt_dt(record.deleted_at)
         when_sent = fmt_dt(record.received_at)
         if record.file_id:
@@ -226,6 +257,19 @@ class Notifier:
         await media_service.send_media(self.bot, target, record, caption)
 
     async def _send_edited(self, target: int, record: MessageLog, tag: str, footer: str) -> None:
+        if not await channel_sub.is_subscribed(self.bot, target):
+            when = fmt_dt(record.edited_at)
+            text = (
+                f"🟣 <b>Изменено сообщение</b> 🔮\n\n"
+                f"👤 <b>Кто:</b> {tag}\n"
+                f"🕐 <b>Изменено:</b> {when}\n\n"
+                f"🔒 Содержимое скрыто. Подпишитесь на канал, чтобы увидеть, что изменилось."
+            )
+            await self.bot.send_message(target, text, reply_markup=locked_notification_kb("edited", record.id))
+            return
+        await self._send_edited_full(target, record, tag, footer)
+
+    async def _send_edited_full(self, target: int, record: MessageLog, tag: str, footer: str) -> None:
         when = fmt_dt(record.edited_at)
         was = self._quote(record.original_text)
         now = self._quote(record.text_content)
