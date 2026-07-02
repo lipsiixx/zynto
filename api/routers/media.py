@@ -8,10 +8,10 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.deps import get_db, require_auth
+from api.deps import get_db, require_admin_any
 from database.queries.media import get_by_unique_id
 
-router = APIRouter(prefix="/media", tags=["media"], dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/media", tags=["media"], dependencies=[Depends(require_admin_any)])
 
 # file_type в media_cache — "photo", "video", etc. Маппим в базовый MIME для отдачи.
 _TYPE_MIME: dict[str, str] = {

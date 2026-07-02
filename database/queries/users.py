@@ -195,6 +195,21 @@ async def list_users(
     return list(res.scalars().all()), total
 
 
+async def find_by_identifier(db: AsyncSession, identifier: str) -> User | None:
+    """Ищет пользователя по @username или Telegram ID.
+
+    Совпадает по логике с `_find_user` в `handlers/admin/users_mgmt.py` и
+    `on_identifier` в `handlers/admin/admins_mgmt.py` — используется обоими
+    сценариями (поиск пользователя, добавление админа) в webapp-админке.
+    """
+    identifier = identifier.strip()
+    if identifier.startswith("@"):
+        return await get_user_by_username(db, identifier)
+    if identifier.isdigit():
+        return await get_user(db, int(identifier))
+    return await get_user_by_username(db, identifier)
+
+
 async def get_user_by_id(db: AsyncSession, user_id: int) -> User | None:
     res = await db.execute(
         select(User).where(

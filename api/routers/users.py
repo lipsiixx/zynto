@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.deps import get_db, require_auth
+from api.deps import get_db, require_admin_any
 from api.schemas import (
     ChatOut,
     ChatsListOut,
@@ -19,7 +19,7 @@ from api.schemas import (
 from database.queries import api as api_q
 from database.queries import users as users_q
 
-router = APIRouter(prefix="/users", tags=["users"], dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/users", tags=["users"], dependencies=[Depends(require_admin_any)])
 
 
 @router.get("", response_model=UsersListOut)

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import Body
-from api.deps import get_db, require_auth
+from api.deps import get_db, require_admin_any
 from api.schemas import (
     CpuOut,
     DiskOut,
@@ -28,7 +28,7 @@ from database.queries import settings as settings_q
 from database.queries import users as users_q
 from services import proxy_monitor as pm_module
 
-router = APIRouter(prefix="/stats", tags=["stats"], dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/stats", tags=["stats"], dependencies=[Depends(require_admin_any)])
 
 _BOOT_TIME = psutil.boot_time()
 

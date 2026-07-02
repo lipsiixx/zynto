@@ -20,4 +20,5 @@ export interface Me {
   subscription: Subscription
   monitoring_active: boolean
   summary: Summary
+  flags?: string[]
 }

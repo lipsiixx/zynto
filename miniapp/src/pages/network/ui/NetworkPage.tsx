@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import ForceGraph2D from "react-force-graph-2d";
-import type { NetworkGraph as NetworkGraphType, NetworkNode } from "@/entities/network";
+import type {
+  NetworkGraph as NetworkGraphType,
+  NetworkNode,
+} from "@/entities/network";
 import { getNetworkGraph } from "@/entities/network";
 import { useApp } from "@/app/AppContext";
 
@@ -28,9 +31,9 @@ interface FGLink {
 const SETTINGS_KEY = "miniapp_graph_settings";
 
 interface GraphSettings {
-  repulsion: number;   // 0–100
-  nodeSize: number;    // 0–100
-  linkWidth: number;   // 0–100
+  repulsion: number; // 0–100
+  nodeSize: number; // 0–100
+  linkWidth: number; // 0–100
   showLabels: boolean;
 }
 
@@ -51,7 +54,9 @@ function loadSettings(): GraphSettings {
   }
 }
 
-function parseStoredSettings(raw: string | null | undefined): GraphSettings | null {
+function parseStoredSettings(
+  raw: string | null | undefined,
+): GraphSettings | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
@@ -73,7 +78,9 @@ function persistSettings(s: GraphSettings): void {
   // unlike localStorage which can be wiped in Telegram's WebView).
   try {
     const cloud =
-      typeof window !== "undefined" ? window.Telegram?.WebApp?.CloudStorage : undefined;
+      typeof window !== "undefined"
+        ? window.Telegram?.WebApp?.CloudStorage
+        : undefined;
     cloud?.setItem(SETTINGS_KEY, raw);
   } catch {
     // ignore — CloudStorage unavailable (e.g. dev browser)
@@ -153,7 +160,9 @@ export function NetworkPage() {
   useEffect(() => {
     try {
       const cloud =
-        typeof window !== "undefined" ? window.Telegram?.WebApp?.CloudStorage : undefined;
+        typeof window !== "undefined"
+          ? window.Telegram?.WebApp?.CloudStorage
+          : undefined;
       if (!cloud) return;
       cloud.getItem(SETTINGS_KEY, (error, value) => {
         if (error) return;
@@ -169,8 +178,12 @@ export function NetworkPage() {
   // Apply repulsion / link distance — runs on data load and whenever slider changes
   useEffect(() => {
     if (!fgRef.current || !graphData) return;
-    fgRef.current.d3Force("charge")?.strength(sliderToCharge(settings.repulsion));
-    fgRef.current.d3Force("link")?.distance(sliderToLinkDist(settings.repulsion));
+    fgRef.current
+      .d3Force("charge")
+      ?.strength(sliderToCharge(settings.repulsion));
+    fgRef.current
+      .d3Force("link")
+      ?.distance(sliderToLinkDist(settings.repulsion));
     fgRef.current.d3ReheatSimulation();
   }, [graphData, settings.repulsion]);
 
@@ -180,12 +193,18 @@ export function NetworkPage() {
     if (!el) return;
     const immediate = el.getBoundingClientRect();
     if (immediate.width > 0 && immediate.height > 0) {
-      setGraphDims({ width: Math.floor(immediate.width), height: Math.floor(immediate.height) });
+      setGraphDims({
+        width: Math.floor(immediate.width),
+        height: Math.floor(immediate.height),
+      });
     }
     const obs = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect;
       if (rect && rect.width > 0 && rect.height > 0) {
-        setGraphDims({ width: Math.floor(rect.width), height: Math.floor(rect.height) });
+        setGraphDims({
+          width: Math.floor(rect.width),
+          height: Math.floor(rect.height),
+        });
       }
     });
     obs.observe(el);
@@ -365,7 +384,9 @@ export function NetworkPage() {
         <div>
           <span style={{ fontWeight: 700, fontSize: 16 }}>Мои связи</span>
           {graphData && (
-            <span style={{ fontSize: 12, color: "var(--text2)", marginLeft: 8 }}>
+            <span
+              style={{ fontSize: 12, color: "var(--text2)", marginLeft: 8 }}
+            >
               {contactCount} контактов
             </span>
           )}
@@ -710,15 +731,25 @@ export function NetworkPage() {
               }}
             >
               <div>
-                <div style={{ fontSize: 14, color: "var(--text)", fontWeight: 500 }}>
+                <div
+                  style={{
+                    fontSize: 14,
+                    color: "var(--text)",
+                    fontWeight: 500,
+                  }}
+                >
                   Показывать подписи
                 </div>
-                <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
+                <div
+                  style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}
+                >
                   Имена контактов под узлами
                 </div>
               </div>
               <button
-                onClick={() => updateSetting("showLabels", !settings.showLabels)}
+                onClick={() =>
+                  updateSetting("showLabels", !settings.showLabels)
+                }
                 style={{
                   width: 50,
                   height: 28,

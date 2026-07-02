@@ -7,7 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.deps import get_db, require_auth
+from api.deps import get_db, require_admin_any
 from api.schemas import (
     MediaListOut,
     MediaOut,
@@ -19,7 +19,7 @@ from api.schemas import (
 from database.queries import api as api_q
 from database.queries import users as users_q
 
-router = APIRouter(prefix="/chats", tags=["chats"], dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/chats", tags=["chats"], dependencies=[Depends(require_admin_any)])
 
 
 @router.get("/{chat_id}/messages", response_model=MessagesListOut)

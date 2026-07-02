@@ -6,10 +6,10 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from api.deps import require_auth
+from api.deps import require_admin_any
 from services import ws_broadcaster as broadcaster
 
-router = APIRouter(prefix="/cache", tags=["cache"], dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/cache", tags=["cache"], dependencies=[Depends(require_admin_any)])
 
 
 class InvalidateRequest(BaseModel):

@@ -4,11 +4,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.deps import get_db, require_auth
+from api.deps import get_db, require_admin_any
 from api.schemas import GraphEdge, GraphNode, GraphOut
 from database.queries import api as api_q
 
-router = APIRouter(prefix="/graph", tags=["graph"], dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/graph", tags=["graph"], dependencies=[Depends(require_admin_any)])
 
 
 @router.get("", response_model=GraphOut)

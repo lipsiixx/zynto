@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import os
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from api import auth, ws
-from api.routers import cache, chats, graph, media, stats, tribute, users, webapp
+from api.routers import admin_bundle, cache, chats, graph, media, stats, tribute, users, webapp, webapp_admin
 
 app = FastAPI(
     title="Zynto Bot API",
@@ -47,6 +47,8 @@ app.include_router(stats.router, prefix=PREFIX)
 app.include_router(graph.router, prefix=PREFIX)
 app.include_router(cache.router, prefix=PREFIX)
 app.include_router(webapp.router, prefix=PREFIX)
+app.include_router(webapp_admin.router, prefix=PREFIX)
+app.include_router(admin_bundle.router, prefix=PREFIX)
 app.include_router(tribute.router, prefix=PREFIX)
 
 
@@ -60,6 +62,9 @@ _SPA_DIR = os.path.join(_BASE, "..", "static")
 _MINIAPP_DIR = os.path.join(_BASE, "..", "static", "miniapp")
 
 # ── Мини-апп (пользовательский, /miniapp/*) ───────────────────────────────
+# Примечание: static/miniapp-admin/ намеренно НЕ монтируется здесь — она отдаётся
+# только через api/routers/admin_bundle.py за require_webapp_admin. Не добавляй
+# её в этот StaticFiles-маунт.
 if os.path.isdir(_MINIAPP_DIR):
     _miniapp_assets = os.path.join(_MINIAPP_DIR, "assets")
     if os.path.isdir(_miniapp_assets):
@@ -74,6 +79,8 @@ if os.path.isdir(_MINIAPP_DIR):
         return FileResponse(os.path.join(_MINIAPP_DIR, "index.html"))
 
 # ── Админ SPA (/, /admin/*) ────────────────────────────────────────────────
+# Примечание: static/miniapp-admin/ намеренно НЕ монтируется здесь — см. комментарий
+# у /miniapp/assets выше.
 if os.path.isdir(_SPA_DIR):
     _assets = os.path.join(_SPA_DIR, "assets")
     if os.path.isdir(_assets):
@@ -85,4 +92,10 @@ if os.path.isdir(_SPA_DIR):
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def _spa_fallback(full_path: str) -> FileResponse:
+        # Пути под API-префиксом (/v1/*) не должны попадать на SPA-фолбэк —
+        # иначе любой несуществующий /v1/... маршрут молча отдаёт index.html
+        # вместо честного 404 (см. app.include_router(..., prefix=PREFIX) выше).
+        api_prefix = PREFIX.lstrip("/") + "/"
+        if full_path == PREFIX.lstrip("/") or full_path.startswith(api_prefix):
+            raise HTTPException(status_code=404)
         return FileResponse(os.path.join(_SPA_DIR, "index.html"))

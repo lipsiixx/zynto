@@ -10,15 +10,16 @@ from typing import Any, Optional
 from aiogram import Bot
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse, Response
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth import create_user_token, verify_user_token, verify_webapp_init_data
 from api.deps import get_db
+from api.deps import require_webapp_user as _require_webapp_auth
 from config import BASE_DIR
 from database.models import MediaCache, MessageLog, MutualRating, User
+from database.queries import admins as admins_q
 from database.queries import referral as referral_q
 from database.queries import business as biz_q
 from database.queries import mutual_rating as mr_q
@@ -33,24 +34,6 @@ from services import subscription as sub_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webapp", tags=["webapp"])
-_bearer = HTTPBearer(auto_error=False)
-
-
-# ── Auth helper ───────────────────────────────────────────────────────────
-
-async def _require_webapp_auth(
-    request: Request,
-    creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
-) -> int:
-    tok = creds.credentials if creds else None
-    if not tok:
-        tok = request.query_params.get("token")
-    if not tok:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-    telegram_id = verify_user_token(tok)
-    if telegram_id is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-    return telegram_id
 
 
 def _get_bot(request: Request) -> Bot | None:
@@ -152,7 +135,7 @@ async def webapp_me(
         if active_sub and active_sub.started_at:
             started_at = active_sub.started_at.isoformat()
 
-    return {
+    result = {
         "telegram_id": user.telegram_id,
         "full_name": user.full_name,
         "username": user.username,
@@ -166,6 +149,16 @@ async def webapp_me(
         "monitoring_active": conn is not None,
         "summary": summary,
     }
+
+    flags: list[str] = []
+    if await admins_q.is_admin(db, telegram_id):
+        flags.append("admin")
+        if await admins_q.is_superadmin(db, telegram_id):
+            flags.append("superadmin")
+    if flags:
+        result["flags"] = flags
+
+    return result
 
 
 @router.get("/contacts")

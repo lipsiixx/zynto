@@ -81,7 +81,9 @@ Telegram-бот (@zynto_bot) на **aiogram 3** / Python 3.12. Перехват�
 
 Запускается только если `API_ENABLED=true` и `API_PASSWORD` задан. Все маршруты под `/v1`. JWT-токены через `api/auth.py`. WebSocket `/v1/ws` и SSE `/v1/events` для real-time событий через `services/ws_broadcaster.py` (fan-out очередь).
 
-SPA: `static/` → `/` (админ-панель), `static/miniapp/` → `/miniapp` (пользовательский мини-апп).
+SPA: `static/` → `/` (легаси админ-панель), `static/miniapp/` → `/miniapp` (пользовательский мини-апп).
+
+**Авторизация в миграции** (`api/deps.py`): старая схема — анонимный парольный токен `API_PASSWORD` → `verify_token` → `require_auth`, без привязки к пользователю. Новая — персональный webapp-JWT (`verify_user_token`) + проверка роли в БД (`database/queries/admins.py`). `require_admin_any` принимает **любой** из двух токенов (переходная зависимость, сейчас на `cache`/`chats`/`media`/`stats`/`users`/`graph` роутерах и на `/ws`, `/events` через ручной `_token_authorized` в `api/ws.py` — WS/SSE не проходят через `Depends()`). `require_webapp_admin` / `require_webapp_superadmin` принимают только новую схему и отдают **404** (не 401/403) на любой отказ, чтобы не палить не-админам сам факт существования маршрута.
 
 **WebApp API** (`api/routers/webapp.py`) — отдельный роутер `/v1/webapp/*` для мини-аппа. Использует собственный JWT (`create_user_token` / `verify_user_token`), отдельный от admin-токенов. Авторизация через Telegram `initData` (`verify_webapp_init_data`). Ключевые группы эндпоинтов:
 
@@ -121,8 +123,18 @@ src/
 cd miniapp
 npm install        # первый раз
 npm run dev        # dev-сервер на :5173, /v1 проксируется на localhost:8000
-npm run build      # собирает в ../static/miniapp
+npm run build      # tsc -b + vite build → ../static/miniapp, затем автоматически build:admin
 ```
+
+### Admin-модуль внутри мини-аппа (`miniapp/src/admin/`)
+
+Админка встраивается прямо в пользовательский мини-апп как отдельно собираемый модуль, а не как отдельная SPA на `/`:
+
+- Собирается отдельной vite-конфигурацией `miniapp/vite.admin.config.ts` (`npm run build:admin`, вход `src/admin/main.tsx`) в `static/miniapp-admin/entry.js` + `entry.css`. Dev: `npm run dev:admin` на порту 5174.
+- `static/miniapp-admin/` **намеренно не примонтирована** как статика (см. комментарии в `api/app.py` рядом с `/assets` и `/miniapp/assets`) — иначе бандл можно скачать по прямому пути в обход проверки прав. Единственная точка доступа — `GET /v1/webapp/modules/core` (`api/routers/admin_bundle.py`), защищённая `require_webapp_admin`; отдаёт JS/CSS как текст в JSON с ETag-кэшированием (404, если админ-бандл не собран).
+- `App.tsx` после `getMe()` проверяет `me.flags?.includes('admin')` (флаги `admin`/`superadmin` добавляет `webapp_me` в `api/routers/webapp.py` через `admins_q.is_admin`/`is_superadmin`) и, если есть, тянет бандл через `shared/module-loader/loadAdminModule.ts` — тот делает `fetch` с JWT, оборачивает JS в `Blob` + `URL.createObjectURL` и делает динамический `import()`. Модуль монтируется в `#admin-root` через экспортируемый `{ mount(el, { token }) }` (см. `src/admin/main.tsx`).
+- Админ-модуль рендерит собственный `RoleChooser` (выбор «Войти как Админ/Пользователь») и, при выборе Админа, собственный `HashRouter` с путями `/a/*` **поверх того же** `window.location.hash`, что и основной роутер мини-аппа. Поэтому в основном `App.tsx` заведён no-op маршрут `<Route path="/a/*" element={null} />` — без него catch-all основного роутера зациклил бы hashchange, редиректя `/a/...` на `/`.
+- Структура `src/admin/` повторяет FSD основного мини-аппа (`entities/{chat,graph,stats,user}`, `pages/`, `shared/`, `widgets/admin-nav`).
 
 ## Критичные инварианты (не ломай)
 
@@ -168,8 +180,15 @@ npm run build      # собирает в ../static/miniapp
 | `STORAGE_TYPE` | `local` или `s3` |
 | `TRIBUTE_API_KEY` | HMAC-ключ вебхука Tribute (СБП) |
 | `REQUIRED_CHANNEL` | Username канала (без `@`) для обязательной подписки, default `zyntobotoficalchannel` |
+| `MEDIA_PATH` | Папка для локального медиа (default `./media`) |
+| `MAX_FILE_SIZE_MB` | Порог скачивания медиа локально; крупнее — пересылка по `file_id` |
+| `TEXT_RETENTION_DAYS` / `MEDIA_RETENTION_DAYS` | Сроки хранения для `cleaner.py` |
 
 Колбэки админки — префикс `a:`. Бизнес-роутер — `get_business_router()`.
+
+Команды бота: `/start`, `/activate КОД`, `/myid`, `/admin` (только админы), `/user @username|ID` (поиск пользователя, админ).
+
+Redis необязателен для работы бота: если недоступен, FSM переключается на in-memory storage, throttle отключается — бот не падает. Уведомления идут через `asyncio.Queue` с задержкой 0.05с между отправками и обработкой `FloodWait`, чтобы не словить лимиты Telegram при массовых удалениях.
 
 **Обязательная подписка на канал:** `services/channel_sub.py` проверяет `bot.get_chat_member` (кэш в Redis 5 мин, без БД-полей). `ChannelSubscriptionMiddleware` на `user_router` (между Auth и Throttle) блокирует любые апдейты неподписанных пользователей, кроме колбэков `checksub`/`subchk:*`. В `notifier.py` `_send_edited`/`_send_deleted` шлют «заблокированную» версию (без содержимого) неподписанным получателям вместо полной — раскрытие через `reveal_edited`/`reveal_deleted` после подтверждения подпиской. Если бот не состоит в канале — проверка fail-open (пропускает всех, warning в логах), поэтому бота нужно добавить в канал участником/админом.
 

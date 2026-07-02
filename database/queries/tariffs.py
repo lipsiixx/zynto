@@ -56,6 +56,25 @@ async def update_tariff(db: AsyncSession, tariff_id: int, **fields) -> Tariff | 
     return tariff
 
 
+async def update_tariff_fields(db: AsyncSession, tariff_id: int, fields: dict) -> Tariff | None:
+    """Частичное обновление, в отличие от `update_tariff` не пропускает явный None.
+
+    Нужно, чтобы `duration_days=None` (вечный тариф) можно было выставить через
+    PATCH-эндпоинт мини-аппа — `update_tariff(**fields)` игнорирует None-значения.
+    Вызывающий код должен передавать только реально присланные клиентом поля
+    (например `body.model_dump(exclude_unset=True)`).
+    """
+    tariff = await get_tariff(db, tariff_id)
+    if tariff is None:
+        return None
+    for key, value in fields.items():
+        if hasattr(tariff, key):
+            setattr(tariff, key, value)
+    await db.commit()
+    await db.refresh(tariff)
+    return tariff
+
+
 async def toggle_tariff(db: AsyncSession, tariff_id: int) -> Tariff | None:
     tariff = await get_tariff(db, tariff_id)
     if tariff is None:

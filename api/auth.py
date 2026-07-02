@@ -36,11 +36,18 @@ def create_token() -> tuple[str, datetime]:
 
 
 def verify_token(token: str) -> bool:
+    """True только для легаси admin-токена (логин по паролю, sub == "admin").
+
+    Проверять именно sub, а не только подпись: пользовательские webapp-токены
+    (`create_user_token`, sub == "user:<id>") подписаны тем же секретом и иначе
+    прошли бы эту проверку, открыв любому залогиненному пользователю мини-аппа
+    доступ к require_auth/require_admin_any-роутерам (/v1/users, /v1/chats, …).
+    """
     try:
-        jwt.decode(token, settings.api_secret, algorithms=[_ALG])
-        return True
+        payload = jwt.decode(token, settings.api_secret, algorithms=[_ALG])
     except jwt.PyJWTError:
         return False
+    return payload.get("sub") == "admin"
 
 
 @router.post("/auth/login", response_model=TokenResponse)
