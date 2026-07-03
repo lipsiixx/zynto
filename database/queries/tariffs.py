@@ -6,6 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import Subscription, Tariff
 
+# Лимит Telegram Bot API на инвойс в XTR (Stars): 1–10000. Цена выше сохранится
+# в БД, но send_invoice упадёт — валидируем на всех точках записи.
+MAX_PRICE_STARS = 10_000
+
 
 async def get_tariff(db: AsyncSession, tariff_id: int) -> Tariff | None:
     res = await db.execute(select(Tariff).where(Tariff.id == tariff_id))
@@ -93,9 +97,10 @@ async def count_subscriptions_for_tariff(db: AsyncSession, tariff_id: int) -> in
 
 
 async def delete_tariff(db: AsyncSession, tariff_id: int) -> bool:
-    """Удаляет тариф только если на него нет подписок."""
-    if await count_subscriptions_for_tariff(db, tariff_id) > 0:
-        return False
+    """Удаляет тариф даже при наличии подписок: история хранит tariff_id без FK
+    и обратно его не резолвит — «висячий» id безопасен. Оплата уже отправленного
+    инвойса на удалённый тариф отбивается в handlers/user/subscription.py
+    (tariff is None → предупреждение пользователю)."""
     tariff = await get_tariff(db, tariff_id)
     if tariff is None:
         return False

@@ -238,6 +238,18 @@ class TariffUpdateBody(BaseModel):
     sort_order: Optional[int] = None
 
 
+def _validate_tariff_fields(fields: dict) -> None:
+    price = fields.get("price_stars")
+    if price is not None and not (1 <= price <= tariffs_q.MAX_PRICE_STARS):
+        raise HTTPException(status_code=422, detail="invalid_price")
+    duration = fields.get("duration_days")
+    if "duration_days" in fields and duration is not None and duration < 1:
+        raise HTTPException(status_code=422, detail="invalid_duration")
+    name = fields.get("name")
+    if "name" in fields and (name is None or not name.strip()):
+        raise HTTPException(status_code=422, detail="invalid_name")
+
+
 @router.get("/tariffs")
 async def admin_tariffs_list(
     _: int = Depends(require_webapp_admin),
@@ -253,6 +265,7 @@ async def admin_tariffs_create(
     telegram_id: int = Depends(require_webapp_admin),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    _validate_tariff_fields(body.model_dump())
     t = await tariffs_q.create_tariff(
         db,
         name=body.name,
@@ -273,6 +286,7 @@ async def admin_tariffs_update(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     fields = body.model_dump(exclude_unset=True)
+    _validate_tariff_fields(fields)
     t = await tariffs_q.update_tariff_fields(db, tariff_id, fields)
     if t is None:
         raise HTTPException(status_code=404, detail="tariff_not_found")
@@ -297,12 +311,9 @@ async def admin_tariffs_delete(
     _: int = Depends(require_webapp_admin),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    tariff = await tariffs_q.get_tariff(db, tariff_id)
-    if tariff is None:
-        raise HTTPException(status_code=404, detail="tariff_not_found")
     ok = await tariffs_q.delete_tariff(db, tariff_id)
     if not ok:
-        raise HTTPException(status_code=409, detail="has_subscriptions")
+        raise HTTPException(status_code=404, detail="tariff_not_found")
     return {"ok": True}
 
 

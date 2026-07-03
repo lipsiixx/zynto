@@ -6,6 +6,9 @@ import { ConfirmButton } from '@/admin/shared/ui'
 
 const EMPTY_FORM: TariffPayload = { name: '', description: '', duration_days: 30, price_stars: 0, sort_order: 0 }
 
+// Лимит Telegram Bot API на инвойс в XTR — бэкенд отдаёт 422 invalid_price выше него
+const MAX_PRICE_STARS = 10000
+
 export function TariffsPage() {
   const { showToast } = useAdminCtx()
   const [items, setItems] = useState<TariffOut[]>([])
@@ -39,10 +42,7 @@ export function TariffsPage() {
         setItems(prev => prev.filter(t => t.id !== id))
         showToast('Тариф удалён', 'success')
       })
-      .catch(e => {
-        const msg = (e as Error).message
-        showToast(msg === 'has_subscriptions' ? 'Нельзя удалить: есть выданные подписки по этому тарифу' : msg, 'error')
-      })
+      .catch(e => showToast((e as Error).message, 'error'))
   }
 
   return (
@@ -155,11 +155,16 @@ function TariffForm({
       setError('Укажи название тарифа')
       return
     }
+    const price = Number(priceStars)
+    if (!price || price < 1 || price > MAX_PRICE_STARS) {
+      setError(`Цена — от 1 до ${MAX_PRICE_STARS}⭐ (лимит Telegram на инвойс в Stars)`)
+      return
+    }
     const payload: TariffPayload = {
       name: name.trim(),
       description: description.trim() || null,
       duration_days: lifetime ? null : Math.max(1, Number(durationDays) || 1),
-      price_stars: Math.max(0, Number(priceStars) || 0),
+      price_stars: price,
       sort_order: Number(sortOrder) || 0,
     }
     setSubmitting(true)
@@ -201,8 +206,8 @@ function TariffForm({
       </div>
       <div className="admin-grid-2">
         <div className="admin-form-row">
-          <label className="text-sm text2">Цена, ⭐</label>
-          <input className="input" type="number" min={0} value={priceStars} onChange={e => setPriceStars(e.target.value)} />
+          <label className="text-sm text2">Цена, ⭐ (1–{MAX_PRICE_STARS})</label>
+          <input className="input" type="number" min={1} max={MAX_PRICE_STARS} value={priceStars} onChange={e => setPriceStars(e.target.value)} />
         </div>
         <div className="admin-form-row">
           <label className="text-sm text2">Порядок сортировки</label>

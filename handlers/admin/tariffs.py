@@ -113,10 +113,13 @@ async def st_duration(message: Message, state: FSMContext) -> None:
 async def st_price(message: Message, state: FSMContext) -> None:
     try:
         price = int(message.text.strip())
-        if price < 1:
+        if not 1 <= price <= tariffs_q.MAX_PRICE_STARS:
             raise ValueError
     except ValueError:
-        await message.answer("Цена должна быть положительным числом. Попробуй ещё раз:")
+        await message.answer(
+            f"Цена должна быть от 1 до {tariffs_q.MAX_PRICE_STARS} ⭐ "
+            "(лимит Telegram на инвойс в Stars). Попробуй ещё раз:"
+        )
         return
     await state.update_data(price_stars=price)
     await state.set_state(CreateTariffStates.waiting_sort_order)
@@ -210,6 +213,12 @@ async def st_value(message: Message, db: AsyncSession, state: FSMContext) -> Non
             return
         if field == "duration_days":
             value = None if num == 0 else num
+        elif field == "price_stars" and not 1 <= num <= tariffs_q.MAX_PRICE_STARS:
+            await message.answer(
+                f"Цена должна быть от 1 до {tariffs_q.MAX_PRICE_STARS} ⭐ "
+                "(лимит Telegram на инвойс в Stars). Попробуй ещё раз:"
+            )
+            return
         else:
             value = num
     else:
