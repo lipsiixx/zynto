@@ -175,9 +175,15 @@ async def list_users(
     status: str | None = None,
     page: int = 1,
     limit: int = 20,
+    include_admins: bool = False,
 ) -> tuple[list[User], int]:
+    """include_admins=True — для webapp-админки «Управление»: админы тоже
+    пользователи бота (выдать себе подписку и т.п.). Мониторинг (/v1/users)
+    по-прежнему скрывает их."""
     from sqlalchemy import or_, cast, Text
-    base = select(User).where(~exists(_admin_tg_ids.where(Admin.telegram_id == User.telegram_id)))
+    base = select(User)
+    if not include_admins:
+        base = base.where(~exists(_admin_tg_ids.where(Admin.telegram_id == User.telegram_id)))
     if q:
         base = base.where(
             or_(

@@ -1,11 +1,12 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import type { UserProfileOut, UserStatsOut, UserSubscriptionItem } from '@/admin/entities/manage-user'
+import { useCallback, useEffect, useState } from 'react'
+import type { ManagedUsersListResponse, UserProfileOut, UserStatsOut, UserSubscriptionItem } from '@/admin/entities/manage-user'
 import {
   banUser,
   findUser,
   getUserStats,
   getUserSubscriptions,
   grantTariff,
+  listManagedUsers,
   setSubscription,
   unbanUser,
 } from '@/admin/entities/manage-user'
@@ -13,7 +14,17 @@ import type { TariffOut } from '@/admin/entities/tariff'
 import { listTariffs } from '@/admin/entities/tariff'
 import { useAdminCtx } from '@/admin/shared/lib/AdminCtx'
 import { fmtDate, fmtDateTime } from '@/admin/shared/lib/format'
-import { ConfirmButton, SubBadge } from '@/admin/shared/ui'
+import { ConfirmButton, Paginator, SubBadge } from '@/admin/shared/ui'
+
+const LIMIT = 25
+
+const STATUSES: { value: string; label: string }[] = [
+  { value: '', label: 'Все статусы' },
+  { value: 'active', label: 'Активна' },
+  { value: 'lifetime', label: 'Навсегда' },
+  { value: 'expired', label: 'Истекла' },
+  { value: 'none', label: 'Нет' },
+]
 
 const PAYMENT_METHOD_LABEL: Record<string, string> = {
   stars: 'Stars',
@@ -24,10 +35,16 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
   tribute_sbp: 'СБП',
 }
 
-// Порт handlers/admin/users_mgmt.py на карточку профиля мини-аппа.
+// Порт handlers/admin/users_mgmt.py: список всех пользователей с живым
+// поиском и фильтром по статусу; клик по ряду открывает карточку управления.
 export function ManageUsersPage() {
   const { showToast } = useAdminCtx()
+  const [qInput, setQInput] = useState('')
   const [q, setQ] = useState('')
+  const [status, setStatus] = useState('')
+  const [page, setPage] = useState(1)
+  const [list, setList] = useState<ManagedUsersListResponse | null>(null)
+  const [listLoading, setListLoading] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [profile, setProfile] = useState<UserProfileOut | null>(null)
@@ -41,6 +58,28 @@ export function ManageUsersPage() {
       .catch(() => {})
   }, [])
 
+  // Дебаунс поиска — как в UsersPage
+  useEffect(() => {
+    const t = setTimeout(() => setQ(qInput), 300)
+    return () => clearTimeout(t)
+  }, [qInput])
+
+  useEffect(() => {
+    setPage(1)
+  }, [q, status])
+
+  const loadList = useCallback(() => {
+    setListLoading(true)
+    listManagedUsers({ q: q || undefined, status: status || undefined, page, limit: LIMIT })
+      .then(setList)
+      .catch(e => setError((e as Error).message))
+      .finally(() => setListLoading(false))
+  }, [q, status, page])
+
+  useEffect(() => {
+    loadList()
+  }, [loadList])
+
   const loadExtras = (telegramId: number) => {
     getUserSubscriptions(telegramId)
       .then(res => setSubs(res.items))
@@ -50,15 +89,12 @@ export function ManageUsersPage() {
       .catch(() => {})
   }
 
-  const search = (e: FormEvent) => {
-    e.preventDefault()
-    if (!q.trim()) return
+  const openUser = (telegramId: number) => {
     setLoading(true)
     setError('')
-    setProfile(null)
     setSubs([])
     setStats(null)
-    findUser(q.trim())
+    findUser(String(telegramId))
       .then(p => {
         setProfile(p)
         loadExtras(p.telegram_id)
@@ -67,46 +103,111 @@ export function ManageUsersPage() {
       .finally(() => setLoading(false))
   }
 
+  const closeProfile = () => {
+    setProfile(null)
+    // после бана/выдачи подписки статусы в списке могли измениться
+    loadList()
+  }
+
+  // Режим карточки: только профиль + кнопка возврата (узкий экран мини-аппа)
+  if (profile || loading) {
+    return (
+      <div className="admin-page">
+        <div className="admin-page-header">
+          <h1>Пользователи</h1>
+          <button className="admin-icon-btn" onClick={closeProfile} disabled={loading}>
+            ← К списку
+          </button>
+        </div>
+
+        {error && <div className="admin-error-msg">{error}</div>}
+
+        {loading ? (
+          <div className="loading-center">
+            <div className="spinner" />
+          </div>
+        ) : (
+          profile && (
+            <UserProfileCard
+              profile={profile}
+              subs={subs}
+              stats={stats}
+              tariffs={tariffs}
+              onUpdated={p => {
+                setProfile(p)
+                loadExtras(p.telegram_id)
+              }}
+              showToast={showToast}
+            />
+          )
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="admin-page">
       <div className="admin-page-header">
         <h1>Пользователи</h1>
+        {!listLoading && list && <span className="text2 text-sm">{list.total} записей</span>}
       </div>
 
-      <form className="admin-search-row" onSubmit={search}>
+      <div className="admin-search-row">
         <div className="search-wrap">
           <input
             className="input"
-            placeholder="@username или Telegram ID…"
-            value={q}
-            onChange={e => setQ(e.target.value)}
+            placeholder="Имя, @username или Telegram ID…"
+            value={qInput}
+            onChange={e => setQInput(e.target.value)}
           />
         </div>
-        <button className="btn btn-primary" style={{ width: 'auto' }} type="submit" disabled={loading}>
-          {loading ? '…' : 'Найти'}
-        </button>
-      </form>
+        <select className="admin-select" value={status} onChange={e => setStatus(e.target.value)}>
+          {STATUSES.map(s => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
+      </div>
 
       {error && <div className="admin-error-msg">{error}</div>}
 
-      {loading && (
+      {listLoading ? (
         <div className="loading-center">
           <div className="spinner" />
         </div>
-      )}
-
-      {profile && (
-        <UserProfileCard
-          profile={profile}
-          subs={subs}
-          stats={stats}
-          tariffs={tariffs}
-          onUpdated={p => {
-            setProfile(p)
-            loadExtras(p.telegram_id)
-          }}
-          showToast={showToast}
-        />
+      ) : !list?.items.length ? (
+        <div className="empty-state">
+          <div className="icon">👥</div>
+          <div>Пользователи не найдены</div>
+        </div>
+      ) : (
+        <>
+          <div className="card admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Пользователь</th>
+                  <th>Подписка</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {list.items.map(u => (
+                  <tr key={u.telegram_id} className="admin-row-clickable" onClick={() => openUser(u.telegram_id)}>
+                    <td>
+                      <div className="semibold">{u.full_name || 'Без имени'}</div>
+                      <div className="text-xs text2">{u.username ? `@${u.username}` : u.telegram_id}</div>
+                    </td>
+                    <td>
+                      <SubBadge status={u.subscription_status} expiresAt={u.subscription_expires_at} />
+                    </td>
+                    <td>{u.is_banned && <span className="badge badge-red">Бан</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Paginator page={page} totalPages={list.pages} onChange={setPage} />
+        </>
       )}
     </div>
   )

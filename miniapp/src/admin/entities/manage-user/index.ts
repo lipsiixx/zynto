@@ -1,4 +1,6 @@
 export type {
+  ManagedUserListItem,
+  ManagedUsersListResponse,
   ManageUserSubStatus,
   SubscriptionAction,
   UserProfileOut,
@@ -6,4 +8,13 @@ export type {
   UserSubscriptionItem,
   UserSubscriptionsResponse,
 } from './model/types'
-export { banUser, findUser, getUserStats, getUserSubscriptions, grantTariff, setSubscription, unbanUser } from './api/manageUserApi'
+export {
+  banUser,
+  findUser,
+  getUserStats,
+  getUserSubscriptions,
+  grantTariff,
+  listManagedUsers,
+  setSubscription,
+  unbanUser,
+} from './api/manageUserApi'

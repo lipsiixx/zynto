@@ -48,3 +48,22 @@ export interface UserStatsOut {
 }
 
 export type SubscriptionAction = 'days' | 'lifetime' | 'revoke'
+
+/** GET /users — лёгкий ряд списка (полный профиль тянется по клику) */
+export interface ManagedUserListItem {
+  telegram_id: number
+  username: string | null
+  full_name: string | null
+  subscription_status: ManageUserSubStatus
+  subscription_expires_at: string | null
+  is_banned: boolean
+  last_active_at: string | null
+  created_at: string
+}
+
+export interface ManagedUsersListResponse {
+  items: ManagedUserListItem[]
+  total: number
+  page: number
+  pages: number
+}

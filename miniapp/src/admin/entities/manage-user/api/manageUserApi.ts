@@ -1,5 +1,21 @@
 import { req } from '@/admin/shared/api/adminApi'
-import type { SubscriptionAction, UserProfileOut, UserStatsOut, UserSubscriptionsResponse } from '../model/types'
+import type {
+  ManagedUsersListResponse,
+  SubscriptionAction,
+  UserProfileOut,
+  UserStatsOut,
+  UserSubscriptionsResponse,
+} from '../model/types'
+
+export function listManagedUsers(params: { q?: string; status?: string; page?: number; limit?: number }): Promise<ManagedUsersListResponse> {
+  const sp = new URLSearchParams()
+  if (params.q) sp.set('q', params.q)
+  if (params.status) sp.set('status', params.status)
+  if (params.page) sp.set('page', String(params.page))
+  if (params.limit) sp.set('limit', String(params.limit))
+  const qs = sp.toString()
+  return req('GET', `/users${qs ? `?${qs}` : ''}`)
+}
 
 /** q — @username или telegram_id, как в _find_user (handlers/admin/users_mgmt.py). 404 "user_not_found". */
 export function findUser(q: string): Promise<UserProfileOut> {

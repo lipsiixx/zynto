@@ -334,6 +334,40 @@ class GrantBody(BaseModel):
     tariff_id: int
 
 
+@router.get("/users")
+async def admin_users_list(
+    q: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(25, ge=1, le=100),
+    _: int = Depends(require_webapp_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Лёгкий список для «Управления» — без business_connected/messages_count
+    (это по 2 запроса на юзера; полный профиль тянется отдельно по клику)."""
+    users, total = await users_q.list_users(
+        db, q=q or None, status=status or None, page=page, limit=limit, include_admins=True
+    )
+    return {
+        "items": [
+            {
+                "telegram_id": u.telegram_id,
+                "username": u.username,
+                "full_name": u.full_name,
+                "subscription_status": u.subscription_status,
+                "subscription_expires_at": _iso(u.subscription_expires_at),
+                "is_banned": u.is_banned,
+                "last_active_at": _iso(u.last_active_at),
+                "created_at": _iso(u.created_at),
+            }
+            for u in users
+        ],
+        "total": total,
+        "page": page,
+        "pages": max(1, -(-total // limit)),
+    }
+
+
 @router.get("/users/find")
 async def admin_users_find(
     q: str = Query(..., min_length=1),
