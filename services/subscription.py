@@ -53,6 +53,24 @@ async def grant_access(
         expires_at: datetime | None = None
     else:
         assert delta is not None
+        if user.subscription_status == "lifetime":
+            # Начисление дней (реферальная награда, промокод, ручная выдача)
+            # пользователю с бессрочным доступом не должно понижать lifetime
+            # до active — пишем только запись в историю.
+            await subs_q.create_subscription(
+                db,
+                user_id=user.telegram_id,
+                tariff_id=tariff_id,
+                expires_at=_now() + delta,
+                payment_method=payment_method,
+                promo_code_id=promo_code_id,
+                telegram_payment_charge_id=telegram_payment_charge_id,
+            )
+            logger.info(
+                "Подписка: user=%s уже lifetime, метод=%s записан только в историю",
+                user.telegram_id, payment_method,
+            )
+            return None
         base = _active_future_expiry(user) or _now()
         status = "active"
         expires_at = base + delta
