@@ -17,8 +17,9 @@ Telegram-бот (@zynto_bot) на **aiogram 3** / Python 3.12. Перехват�
 | `db-reset` | пересоздать локальную БД с нуля + миграции |
 | `syntax` | `compileall` — проверка синтаксиса |
 | `deploy` / `push` | сборка UI + push + деплой на сервер |
+| `logs` | tail локального `logs/bot.log` (`-Wait -Tail 60`) |
 | `ssh` | SSH-сессия на сервер |
-| `server-logs` / `server-restart` / `server-status` / `server-migrate` | операции на сервере |
+| `server-logs` / `server-restart` / `server-status` / `server-migrate` / `server-update-pat` | операции на сервере |
 
 Сырые команды (если `z.ps1` недоступен):
 
@@ -99,6 +100,10 @@ SPA: `static/` → `/` (легаси админ-панель), `static/miniapp/`
 | Network | `GET /webapp/network/status`, `POST /network/join`, `PUT /network/settings`, `GET /network/graph` |
 | Media | `GET /webapp/media/{file_unique_id}`, `GET /webapp/instruction-photo` |
 
+**WebApp Admin API** (`api/routers/webapp_admin.py`) — REST для админ-модуля мини-аппа, `/v1/webapp/admin/*`. Все эндпоинты за `require_webapp_admin`, управление админами и настройками — за `require_webapp_superadmin` (обе отдают 404 при отказе). Группы: overview/server/proxy (мониторинг), promo, tariffs, users (ban/grant/поиск), broadcast, admins, nudge, about, tribute, course, cleanup, referral. Дублирует функциональность бот-админки `/admin` — при изменении логики (например, форматов промокодов или nudge) проверяй оба места.
+
+**Tribute-вебхук** (`api/routers/tribute.py`) — `POST /v1/tribute/webhook`, без JWT: проверка HMAC-SHA256 подписи заголовка `trbt-signature` ключом `TRIBUTE_API_KEY`. На любой неуспех кроме неверной подписи отвечает `{"ok": true}`, чтобы Tribute не ретраил.
+
 ### Мини-апп (`miniapp/`)
 
 React 18 + Vite + TypeScript. Структура по **FSD (Feature-Sliced Design)**:
@@ -134,7 +139,7 @@ npm run build      # tsc -b + vite build → ../static/miniapp, затем ав�
 - `static/miniapp-admin/` **намеренно не примонтирована** как статика (см. комментарии в `api/app.py` рядом с `/assets` и `/miniapp/assets`) — иначе бандл можно скачать по прямому пути в обход проверки прав. Единственная точка доступа — `GET /v1/webapp/modules/core` (`api/routers/admin_bundle.py`), защищённая `require_webapp_admin`; отдаёт JS/CSS как текст в JSON с ETag-кэшированием (404, если админ-бандл не собран).
 - `App.tsx` после `getMe()` проверяет `me.flags?.includes('admin')` (флаги `admin`/`superadmin` добавляет `webapp_me` в `api/routers/webapp.py` через `admins_q.is_admin`/`is_superadmin`) и, если есть, тянет бандл через `shared/module-loader/loadAdminModule.ts` — тот делает `fetch` с JWT, оборачивает JS в `Blob` + `URL.createObjectURL` и делает динамический `import()`. Модуль монтируется в `#admin-root` через экспортируемый `{ mount(el, { token }) }` (см. `src/admin/main.tsx`).
 - Админ-модуль рендерит собственный `RoleChooser` (выбор «Войти как Админ/Пользователь») и, при выборе Админа, собственный `HashRouter` с путями `/a/*` **поверх того же** `window.location.hash`, что и основной роутер мини-аппа. Поэтому в основном `App.tsx` заведён no-op маршрут `<Route path="/a/*" element={null} />` — без него catch-all основного роутера зациклил бы hashchange, редиректя `/a/...` на `/`.
-- Структура `src/admin/` повторяет FSD основного мини-аппа (`entities/{chat,graph,stats,user}`, `pages/`, `shared/`, `widgets/admin-nav`).
+- Структура `src/admin/` повторяет FSD основного мини-аппа (`entities/`, `pages/`, `shared/`, `widgets/admin-nav`); entities соответствуют группам эндпоинтов WebApp Admin API (promo, tariffs, broadcast, nudge, tribute и т.д.).
 
 ## Критичные инварианты (не ломай)
 
