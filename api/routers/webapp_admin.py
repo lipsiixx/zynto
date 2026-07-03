@@ -38,6 +38,7 @@ from database.queries import settings as settings_q
 from database.queries import subscriptions as subs_q
 from database.queries import tariffs as tariffs_q
 from database.queries import users as users_q
+from database.queries import webapp as webapp_q
 from services import broadcast_job
 from services import proxy_monitor as proxy_monitor_module
 from services import server_monitor
@@ -191,6 +192,20 @@ async def admin_promo_create(
         discount_tariff_id=body.discount_tariff_id if body.code_type == "discount" else None,
     )
     return _promo_out(promo)
+
+
+@router.delete("/promo/{promo_id}")
+async def admin_promo_delete(
+    promo_id: int,
+    telegram_id: int = Depends(require_webapp_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    promo = await promo_q.get_by_id(db, promo_id)
+    if promo is None:
+        raise HTTPException(status_code=404, detail="promo_not_found")
+    await promo_q.delete_promo(db, promo_id)
+    logger.info("WebApp admin: промокод удалён id=%s code=%s by=%s", promo_id, promo.code, telegram_id)
+    return {"ok": True}
 
 
 # ── Тарифы ────────────────────────────────────────────────────────────────
@@ -408,6 +423,86 @@ async def admin_users_subscriptions(
             for s in subs
         ]
     }
+
+
+@router.get("/users/{tid}/stats")
+async def admin_users_stats(
+    tid: int,
+    _: int = Depends(require_webapp_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    user = await users_q.get_user(db, tid)
+    if user is None:
+        raise HTTPException(status_code=404, detail="user_not_found")
+
+    summary = await webapp_q.get_user_summary(db, tid)
+    referral = await referral_q.get_stats_for_referrer(db, tid)
+    subs = await subs_q.list_user_subscriptions(db, tid, limit=1000)
+    by_method: dict[str, int] = {}
+    for s in subs:
+        by_method[s.payment_method] = by_method.get(s.payment_method, 0) + 1
+
+    return {
+        "summary": summary,
+        "referral": referral,
+        "payments": {"total": len(subs), "by_method": by_method},
+    }
+
+
+class SubscriptionSetBody(BaseModel):
+    action: str  # days | lifetime | revoke
+    days: Optional[int] = None
+
+
+@router.post("/users/{tid}/subscription")
+async def admin_users_subscription_set(
+    tid: int,
+    body: SubscriptionSetBody,
+    request: Request,
+    telegram_id: int = Depends(require_webapp_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Ручная настройка подписки: выдать N дней (продлевает от текущего
+    expires_at через grant_access), сделать lifetime или забрать доступ."""
+    user = await users_q.get_user(db, tid)
+    if user is None:
+        raise HTTPException(status_code=404, detail="user_not_found")
+
+    notify_text: str | None = None
+    if body.action == "days":
+        if not body.days or body.days < 1 or body.days > 3650:
+            raise HTTPException(status_code=422, detail="invalid_days")
+        expires_at = await sub_service.activate_subscription(
+            db, user, duration_days=body.days, payment_method="manual"
+        )
+        notify_text = f"🎁 Тебе выдан доступ на <b>{body.days} дн.</b>"
+        if expires_at:
+            notify_text += f" (до {expires_at.strftime('%d.%m.%Y')})"
+    elif body.action == "lifetime":
+        await sub_service.activate_subscription(
+            db, user, duration_days=None, payment_method="manual"
+        )
+        notify_text = "🎁 Тебе выдан <b>бессрочный</b> доступ!"
+    elif body.action == "revoke":
+        await users_q.update_subscription_fields(db, tid, "none", None)
+    else:
+        raise HTTPException(status_code=422, detail="invalid_action")
+
+    logger.info(
+        "WebApp admin: ручная настройка подписки target=%s action=%s days=%s by=%s",
+        tid, body.action, body.days, telegram_id,
+    )
+
+    if notify_text:
+        bot = _get_bot(request)
+        if bot:
+            try:
+                await bot.send_message(tid, notify_text)
+            except Exception:  # noqa: BLE001
+                pass
+
+    user = await users_q.get_user(db, tid)
+    return await _user_profile_out(db, user)
 
 
 # ── Рассылка ──────────────────────────────────────────────────────────────

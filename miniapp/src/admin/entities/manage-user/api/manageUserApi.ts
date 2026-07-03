@@ -1,5 +1,5 @@
 import { req } from '@/admin/shared/api/adminApi'
-import type { UserProfileOut, UserSubscriptionsResponse } from '../model/types'
+import type { SubscriptionAction, UserProfileOut, UserStatsOut, UserSubscriptionsResponse } from '../model/types'
 
 /** q — @username или telegram_id, как в _find_user (handlers/admin/users_mgmt.py). 404 "user_not_found". */
 export function findUser(q: string): Promise<UserProfileOut> {
@@ -20,4 +20,13 @@ export function grantTariff(telegramId: number, tariffId: number): Promise<UserP
 
 export function getUserSubscriptions(telegramId: number): Promise<UserSubscriptionsResponse> {
   return req('GET', `/users/${telegramId}/subscriptions`)
+}
+
+export function getUserStats(telegramId: number): Promise<UserStatsOut> {
+  return req('GET', `/users/${telegramId}/stats`)
+}
+
+/** action=days требует days (1–3650); lifetime/revoke — без параметров */
+export function setSubscription(telegramId: number, action: SubscriptionAction, days?: number): Promise<UserProfileOut> {
+  return req('POST', `/users/${telegramId}/subscription`, { action, days: days ?? null })
 }

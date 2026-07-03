@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { CreatePromoPayload, PromoCodeType, PromoFilter, PromoOut } from '@/admin/entities/promo'
-import { PROMO_DURATION_PRESETS, PROMO_MAX_USES_PRESETS, createPromo, listPromo } from '@/admin/entities/promo'
+import { PROMO_DURATION_PRESETS, PROMO_MAX_USES_PRESETS, createPromo, deletePromo, listPromo } from '@/admin/entities/promo'
 import type { TariffOut } from '@/admin/entities/tariff'
 import { listTariffs } from '@/admin/entities/tariff'
 import { useAdminCtx } from '@/admin/shared/lib/AdminCtx'
 import { fmtDate } from '@/admin/shared/lib/format'
-import { CopyButton } from '@/admin/shared/ui'
+import { ConfirmButton, CopyButton } from '@/admin/shared/ui'
 
 const FILTERS: { value: PromoFilter; label: string }[] = [
   { value: 'all', label: 'Все' },
@@ -101,7 +101,18 @@ export function PromoPage() {
       ) : (
         <div className="admin-card-list">
           {items.map(p => (
-            <PromoCard key={p.id} promo={p} />
+            <PromoCard
+              key={p.id}
+              promo={p}
+              onDelete={() => {
+                deletePromo(p.id)
+                  .then(() => {
+                    showToast('Промокод удалён', 'success')
+                    setItems(list => list.filter(x => x.id !== p.id))
+                  })
+                  .catch(e => showToast((e as Error).message, 'error'))
+              }}
+            />
           ))}
         </div>
       )}
@@ -109,7 +120,7 @@ export function PromoPage() {
   )
 }
 
-function PromoCard({ promo }: { promo: PromoOut }) {
+function PromoCard({ promo, onDelete }: { promo: PromoOut; onDelete: () => void }) {
   const detail =
     promo.code_type === 'discount'
       ? `Скидка ${promo.discount_stars ?? 0}⭐ на ${promo.discount_tariff_id ? `тариф #${promo.discount_tariff_id}` : 'любой тариф'}`
@@ -129,7 +140,10 @@ function PromoCard({ promo }: { promo: PromoOut }) {
         <span>Создан: {fmtDate(promo.created_at)}</span>
       </div>
       {promo.note && <div className="text-xs text2" style={{ marginBottom: 8 }}>Заметка: {promo.note}</div>}
-      <CopyButton text={promo.code} />
+      <div className="row gap-8" style={{ flexWrap: 'wrap' }}>
+        <CopyButton text={promo.code} />
+        <ConfirmButton label="Удалить" className="admin-icon-btn" onConfirm={onDelete} />
+      </div>
     </div>
   )
 }

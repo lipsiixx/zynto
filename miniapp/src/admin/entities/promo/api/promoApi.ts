@@ -8,3 +8,7 @@ export function listPromo(filter: PromoFilter = 'all'): Promise<PromoListRespons
 export function createPromo(payload: CreatePromoPayload): Promise<PromoOut> {
   return req('POST', '/promo', payload)
 }
+
+export function deletePromo(id: number): Promise<{ ok: boolean }> {
+  return req('DELETE', `/promo/${id}`)
+}

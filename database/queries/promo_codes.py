@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy import and_, delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import PromoCode
@@ -123,6 +123,12 @@ async def list_recent(db: AsyncSession, limit: int = 20, flt: str = "all") -> li
     stmt = stmt.order_by(desc(PromoCode.created_at)).limit(limit)
     res = await db.execute(stmt)
     return list(res.scalars().all())
+
+
+async def delete_promo(db: AsyncSession, promo_id: int) -> None:
+    """Использованные подписки хранят promo_code_id без FK — история не ломается."""
+    await db.execute(delete(PromoCode).where(PromoCode.id == promo_id))
+    await db.commit()
 
 
 async def count_all(db: AsyncSession) -> int:

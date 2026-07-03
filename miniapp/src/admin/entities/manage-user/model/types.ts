@@ -26,3 +26,25 @@ export interface UserSubscriptionItem {
 export interface UserSubscriptionsResponse {
   items: UserSubscriptionItem[]
 }
+
+/** GET /users/{tid}/stats */
+export interface UserStatsOut {
+  summary: {
+    contacts: number
+    total_messages: number
+    deleted: number
+    edited: number
+  }
+  referral: {
+    total_referred: number
+    total_converted: number
+    total_rewards: number
+    total_days_earned: number
+  }
+  payments: {
+    total: number
+    by_method: Record<string, number>
+  }
+}
+
+export type SubscriptionAction = 'days' | 'lifetime' | 'revoke'
