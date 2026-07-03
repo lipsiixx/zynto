@@ -1,5 +1,6 @@
 export type {
   CpuStats,
+  DailyStatItem,
   DiskStats,
   FeedEvent,
   GlobalUserStats,
@@ -8,7 +9,8 @@ export type {
   ProxyState,
   ProxyStats,
   ServerStats,
+  UserDailyStatItem,
   WsEvent,
   WsEventName,
 } from './model/types'
-export { getGlobalUserStats, getProxyStats, getServerStats } from './api/statsApi'
+export { getDailyStats, getGlobalUserStats, getProxyStats, getServerStats, getUserDailyStats } from './api/statsApi'

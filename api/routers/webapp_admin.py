@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import aiohttp
@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.deps import get_db, require_webapp_admin, require_webapp_superadmin
 from config import settings as cfg
 from database.models import Admin, NudgeMessage, PromoCode, Tariff, User
+from database.queries import admin_stats as admin_stats_q
 from database.queries import admins as admins_q
 from database.queries import business as business_q
 from database.queries import messages as messages_q
@@ -103,6 +104,61 @@ async def admin_proxy_check(_: int = Depends(require_webapp_admin)) -> dict:
         return _proxy_status()
     text = await monitor.check_now()
     return {"active": True, "text": text}
+
+
+def _day_range(days: int) -> list[str]:
+    today = datetime.now(timezone.utc).date()
+    return [(today - timedelta(days=d)).strftime("%Y-%m-%d") for d in range(days - 1, -1, -1)]
+
+
+@router.get("/stats/daily")
+async def admin_stats_daily(
+    days: int = Query(30, ge=7, le=90),
+    _: int = Depends(require_webapp_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Дневная динамика для графиков «Статистики»: нулевые дни дозаполнены."""
+    new_users = await admin_stats_q.daily_new_users(db, days)
+    msgs = await admin_stats_q.daily_messages(db, days)
+    pays = await admin_stats_q.daily_payments(db, days)
+    return {
+        "items": [
+            {
+                "date": d,
+                "new_users": new_users.get(d, 0),
+                "messages": msgs["messages"].get(d, 0),
+                "deleted": msgs["deleted"].get(d, 0),
+                "edited": msgs["edited"].get(d, 0),
+                "grants": pays["total"].get(d, 0),
+                "paid": pays["paid"].get(d, 0),
+            }
+            for d in _day_range(days)
+        ]
+    }
+
+
+@router.get("/users/{tid}/stats/daily")
+async def admin_user_stats_daily(
+    tid: int,
+    days: int = Query(30, ge=7, le=90),
+    _: int = Depends(require_webapp_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    user = await users_q.get_user(db, tid)
+    if user is None:
+        raise HTTPException(status_code=404, detail="user_not_found")
+    msgs = await admin_stats_q.daily_messages(db, days, user_id=tid)
+    return {
+        "items": [
+            {
+                "date": d,
+                "messages": msgs["messages"].get(d, 0),
+                "deleted": msgs["deleted"].get(d, 0),
+                "edited": msgs["edited"].get(d, 0),
+            }
+            for d in _day_range(days)
+        ]
+    }
 
 
 # ── Промокоды ─────────────────────────────────────────────────────────────

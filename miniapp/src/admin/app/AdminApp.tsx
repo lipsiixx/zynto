@@ -10,6 +10,7 @@ import { UsersPage } from '@/admin/pages/users/UsersPage'
 import { UserDetailPage } from '@/admin/pages/users/UserDetailPage'
 import { ChatMessagesPage } from '@/admin/pages/chat-messages/ChatMessagesPage'
 import { StatsPage } from '@/admin/pages/stats/StatsPage'
+import { UserStatsPage } from '@/admin/pages/stats/UserStatsPage'
 import { GraphPage } from '@/admin/pages/graph/GraphPage'
 import { PromoPage } from '@/admin/pages/promo/PromoPage'
 import { TariffsPage } from '@/admin/pages/tariffs/TariffsPage'
@@ -50,6 +51,7 @@ export function AdminApp({ token }: Props) {
               <Route path="/a/users/:id" element={<UserDetailPage />} />
               <Route path="/a/chat/:userId/:chatId" element={<ChatMessagesPage />} />
               <Route path="/a/stats" element={<StatsPage />} />
+              <Route path="/a/stats/user/:tid" element={<UserStatsPage />} />
               <Route path="/a/graph" element={<GraphPage />} />
               <Route path="/a/promo" element={<PromoPage />} />
               <Route path="/a/tariffs" element={<TariffsPage />} />

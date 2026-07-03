@@ -79,3 +79,21 @@ export interface FeedEvent extends WsEvent {
   _id: number
   _receivedAt: number
 }
+
+// ── Дневная динамика (GET /webapp/admin/stats/daily) ───────────────────────
+export interface DailyStatItem {
+  date: string
+  new_users: number
+  messages: number
+  deleted: number
+  edited: number
+  grants: number
+  paid: number
+}
+
+export interface UserDailyStatItem {
+  date: string
+  messages: number
+  deleted: number
+  edited: number
+}
