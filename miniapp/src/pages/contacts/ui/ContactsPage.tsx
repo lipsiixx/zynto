@@ -1,7 +1,9 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Contact } from '@/entities/contact'
 import { getContacts, TrustBar } from '@/entities/contact'
+import { haptics } from '@/shared/lib/haptics'
+import { Skeleton } from '@/shared/ui'
 
 function fmtRelative(iso: string | null) {
   if (!iso) return ''
@@ -27,6 +29,9 @@ export function ContactsPage() {
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<'all' | 'deleted' | 'edited'>('all')
+  // Stagger-анимация только для первого показа списка; фильтры/поиск — без неё
+  const firstAnim = useRef(true)
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const load = useCallback(async (query = '') => {
     setLoading(true)
@@ -40,10 +45,17 @@ export function ContactsPage() {
 
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    if (!loading && firstAnim.current) {
+      const t = setTimeout(() => { firstAnim.current = false }, 700)
+      return () => clearTimeout(t)
+    }
+  }, [loading])
+
   const handleSearch = (v: string) => {
     setQ(v)
-    const timer = setTimeout(() => load(v), 300)
-    return () => clearTimeout(timer)
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    searchTimer.current = setTimeout(() => load(v), 300)
   }
 
   const filtered = contacts.filter(c => {
@@ -82,7 +94,7 @@ export function ContactsPage() {
           <button
             key={f}
             className={`tab${filter === f ? ' active' : ''}`}
-            onClick={() => setFilter(f)}
+            onClick={() => { haptics.select(); setFilter(f) }}
           >
             {f === 'all' ? 'Все' : f === 'deleted' ? '🗑 Удалённые' : '✏️ Изменённые'}
           </button>
@@ -90,24 +102,55 @@ export function ContactsPage() {
       </div>
 
       {loading ? (
-        <div className="loading-center"><div className="spinner" /></div>
+        <ContactsSkeleton />
       ) : filtered.length === 0 ? (
         <div className="empty-state">
           <div className="icon">📭</div>
           <div>Контактов не найдено</div>
         </div>
       ) : (
-        filtered.map(c => (
-          <ContactRow key={c.chat_id} contact={c} onClick={() => navigate(`/contacts/${c.chat_id}`)} />
+        filtered.map((c, i) => (
+          <ContactRow
+            key={c.chat_id}
+            contact={c}
+            animDelay={firstAnim.current ? Math.min(i, 8) * 30 : null}
+            onClick={() => { haptics.tap(); navigate(`/contacts/${c.chat_id}`) }}
+          />
         ))
       )}
     </div>
   )
 }
 
-function ContactRow({ contact: c, onClick }: { contact: Contact; onClick: () => void }) {
+function ContactsSkeleton() {
   return (
-    <div className="card" style={{ cursor: 'pointer', padding: '12px 14px' }} onClick={onClick}>
+    <>
+      {[0, 1, 2, 3, 4].map(i => (
+        <div key={i} className="card" style={{ padding: '12px 14px' }}>
+          <div className="row">
+            <Skeleton h={40} w={40} r="50%" />
+            <div style={{ flex: 1 }}>
+              <Skeleton h={14} w="60%" />
+              <Skeleton h={10} w="40%" style={{ marginTop: 8 }} />
+            </div>
+          </div>
+        </div>
+      ))}
+    </>
+  )
+}
+
+function ContactRow({ contact: c, animDelay, onClick }: { contact: Contact; animDelay: number | null; onClick: () => void }) {
+  return (
+    <div
+      className={`card card-tap${animDelay !== null ? ' anim-rise' : ''}`}
+      style={{
+        cursor: 'pointer',
+        padding: '12px 14px',
+        ...(animDelay ? { animationDelay: `${animDelay}ms` } : {}),
+      }}
+      onClick={onClick}
+    >
       <div className="row">
         <div className="avatar">{initials(c.chat_title)}</div>
         <div style={{ flex: 1, minWidth: 0 }}>

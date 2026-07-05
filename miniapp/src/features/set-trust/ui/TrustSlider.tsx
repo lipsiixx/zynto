@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Contact } from '@/entities/contact'
 import { TrustCircle, setTrust } from '@/entities/contact'
+import { haptics } from '@/shared/lib/haptics'
 
 interface Props {
   contact: Contact | null
@@ -18,6 +19,7 @@ export function TrustSlider({ contact, manualScore, autoScore, mrActive, display
   const [savingTrust, setSavingTrust] = useState(false)
 
   const saveTrust = async (score: number | null) => {
+    haptics.select()
     setSavingTrust(true)
     try {
       await setTrust(cid, score)

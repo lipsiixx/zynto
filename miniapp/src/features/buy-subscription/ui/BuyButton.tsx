@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Tariff } from '@/entities/tariff'
 import { buyTariff } from '@/entities/tariff'
+import { haptics } from '@/shared/lib/haptics'
 
 interface Props {
   tariff: Tariff
@@ -12,13 +13,16 @@ export function BuyButton({ tariff, onSuccess, onError }: Props) {
   const [buying, setBuying] = useState(false)
 
   const handleBuy = async () => {
+    haptics.tap()
     setBuying(true)
     try {
       const res = await buyTariff(tariff.id)
+      haptics.success()
       onSuccess?.(res.message)
       // Close mini app so user can see the invoice in chat
       setTimeout(() => window.Telegram?.WebApp?.close(), 1200)
     } catch (e) {
+      haptics.error()
       onError?.((e as Error).message || 'Ошибка')
     } finally {
       setBuying(false)

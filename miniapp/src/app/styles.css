@@ -19,6 +19,9 @@
   --radius: 14px;
   --radius-sm: 8px;
   --nav-h: 58px;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.28);
+  --ease-spring: cubic-bezier(0.25, 0.8, 0.25, 1);
+  --card-grad: linear-gradient(180deg, rgba(167, 139, 250, 0.05), rgba(167, 139, 250, 0) 42%);
   /* JS ставит --tg-inset-top/bottom из safeAreaInset + contentSafeAreaInset */
   --safe-top: max(env(safe-area-inset-top, 0px), var(--tg-inset-top, 0px));
   --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--tg-inset-bottom, 0px));
@@ -74,11 +77,12 @@ body {
 
 /* ── Cards ──────────────────────────────────────────────────────────────── */
 .card {
-  background: var(--bg-card);
+  background: var(--card-grad), var(--bg-card);
   border: 1px solid var(--purple-border);
   border-radius: var(--radius);
   padding: 16px;
   margin-bottom: 12px;
+  box-shadow: var(--shadow-1);
 }
 
 .card-glow {
@@ -93,15 +97,17 @@ body {
   right: 0;
   height: var(--nav-total);
   padding-bottom: var(--safe-bottom);
-  background: rgba(13, 13, 20, 0.97);
+  background: rgba(13, 13, 20, 0.92);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-top: 1px solid var(--purple-border);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
   display: flex;
   z-index: 100;
 }
 
 .nav-item {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -125,6 +131,31 @@ body {
   width: 22px;
   height: 22px;
   stroke-width: 1.8;
+  transition: transform 0.2s var(--ease-spring);
+}
+
+.nav-item.active svg {
+  transform: translateY(-1px);
+}
+
+/* Пилюля-индикатор активной вкладки; absolute — не сдвигает layout */
+.nav-item .nav-dot {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 14px;
+  height: 3px;
+  margin-left: -7px;
+  border-radius: 2px;
+  background: var(--purple-l);
+  transform: scaleX(0);
+  opacity: 0;
+  transition: transform 0.2s var(--ease-spring), opacity 0.2s;
+}
+
+.nav-item.active .nav-dot {
+  transform: scaleX(1);
+  opacity: 1;
 }
 
 /* ── Trust circle ────────────────────────────────────────────────────────── */
@@ -481,6 +512,11 @@ input[type=range]::-moz-range-thumb {
 .how-connect-chevron {
   font-size: 11px;
   color: var(--text3);
+  transition: transform 0.25s var(--ease-spring);
+}
+
+.how-connect-chevron.open {
+  transform: rotate(180deg);
 }
 
 .how-connect-body {
@@ -615,7 +651,7 @@ input[type=range]::-moz-range-thumb {
 .btn-primary {
   background: linear-gradient(135deg, var(--purple), #6d28d9);
   color: #fff;
-  box-shadow: 0 4px 16px var(--purple-glow);
+  box-shadow: 0 4px 16px var(--purple-glow), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .btn-secondary {
@@ -737,12 +773,13 @@ input[type=range]::-moz-range-thumb {
 }
 
 .tariff-card {
-  background: var(--bg-card);
+  background: var(--card-grad), var(--bg-card);
   border: 1px solid var(--purple-border);
   border-radius: var(--radius);
   padding: 16px;
   cursor: pointer;
   transition: border-color 0.15s, transform 0.1s;
+  box-shadow: var(--shadow-1);
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -826,4 +863,89 @@ input[type=range]::-moz-range-thumb {
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(-8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+.toast-leaving {
+  animation: toast-out 0.25s ease forwards;
+}
+
+@keyframes toast-out {
+  to { opacity: 0; transform: translateY(-8px); }
+}
+
+/* ── Page transitions (PageViewport) ─────────────────────────────────────── */
+/* Только transform/opacity; fill по умолчанию (none) — после анимации
+   transform снят, position:fixed внутри страниц работает нормально. */
+.pv {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pv-enter-fwd  { animation: pv-fwd 0.24s var(--ease-spring); }
+.pv-enter-back { animation: pv-back 0.24s var(--ease-spring); }
+
+@keyframes pv-fwd  { from { transform: translateX(22%);  opacity: 0; } }
+@keyframes pv-back { from { transform: translateX(-22%); opacity: 0; } }
+
+/* ── Skeleton loaders ────────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-card2) 25%, #232345 50%, var(--bg-card2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes shimmer {
+  to { background-position: -200% 0; }
+}
+
+/* ── Entrance / press micro-interactions ─────────────────────────────────── */
+.anim-rise {
+  animation: rise 0.26s var(--ease-spring) both;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+.card-tap {
+  transition: transform 0.12s ease;
+}
+
+.card-tap:active {
+  transform: scale(0.98);
+}
+
+/* ── Bottom sheets (NetworkPage) ─────────────────────────────────────────── */
+.sheet-backdrop {
+  animation: fade-in 0.2s ease;
+}
+
+.sheet {
+  animation: sheet-up 0.28s var(--ease-spring);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+/* Спиннер оставлен: индикация загрузки важнее, чем отсутствие движения. */
+@media (prefers-reduced-motion: reduce) {
+  .pv-enter-fwd, .pv-enter-back, .anim-rise, .skeleton,
+  .sheet, .sheet-backdrop, .toast, .toast-leaving, .countdown-urgent {
+    animation: none !important;
+  }
+  .how-connect-chevron, .nav-item svg, .nav-item .nav-dot, .sub-bar-fill, .sub-bar-emoji {
+    transition: none !important;
+  }
+  .card-tap:active, .btn:active, .tariff-card:active {
+    transform: none;
+  }
 }

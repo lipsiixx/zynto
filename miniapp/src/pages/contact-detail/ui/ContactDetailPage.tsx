@@ -9,6 +9,7 @@ import { getMutualRating } from '@/entities/mutual-rating'
 import { MutualRatingCard } from '@/features/mutual-rating'
 import { TrustSlider } from '@/features/set-trust'
 import { useApp } from '@/app/AppContext'
+import { haptics } from '@/shared/lib/haptics'
 
 function ActivityChart({ data }: { data: DayStat[] }) {
   if (!data.length) return null
@@ -186,7 +187,7 @@ export function ContactDetailPage() {
       {/* Events */}
       <div className="tabs mt-8">
         {['all', 'deleted', 'edited', 'media'].map(f => (
-          <button key={f} className={`tab${filter === f ? ' active' : ''}`} onClick={() => changeFilter(f)}>
+          <button key={f} className={`tab${filter === f ? ' active' : ''}`} onClick={() => { haptics.select(); changeFilter(f) }}>
             {f === 'all' ? 'Все' : f === 'deleted' ? '🗑 Удалённые' : f === 'edited' ? '✏️ Изменённые' : '📎 Медиа'}
           </button>
         ))}

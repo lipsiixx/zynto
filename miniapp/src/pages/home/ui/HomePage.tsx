@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/app/AppContext";
 import { getInstructionPhotoUrl } from "@/entities/message";
+import { useCountUp } from "@/shared/lib/useCountUp";
+import { Skeleton } from "@/shared/ui";
 
 // ── Countdown ─────────────────────────────────────────────────────────────
 
@@ -138,7 +140,7 @@ function HowToConnect() {
     <div className="card" style={{ marginBottom: 12 }}>
       <button className="how-connect-toggle" onClick={() => setOpen((o) => !o)}>
         <span>📋 Как подключить бота?</span>
-        <span className="how-connect-chevron">{open ? "▲" : "▼"}</span>
+        <span className={`how-connect-chevron${open ? " open" : ""}`}>▼</span>
       </button>
 
       {open && (
@@ -219,8 +221,26 @@ export function HomePage() {
 
   if (!me) {
     return (
-      <div className="loading-center">
-        <div className="spinner" />
+      <div className="page">
+        <div className="card" style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <Skeleton h={56} w={56} r="50%" />
+          <div style={{ flex: 1 }}>
+            <Skeleton h={16} w="55%" />
+            <Skeleton h={12} w="35%" style={{ marginTop: 8 }} />
+          </div>
+        </div>
+        <div className="card">
+          <Skeleton h={60} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="card" style={{ padding: "14px 16px", marginBottom: 0 }}>
+              <Skeleton h={22} w={22} r="50%" />
+              <Skeleton h={20} w="50%" style={{ marginTop: 8 }} />
+              <Skeleton h={10} w="70%" style={{ marginTop: 6 }} />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -361,7 +381,7 @@ export function HomePage() {
 
       {/* Реферальная программа — доступна всем, и без подписки */}
       <div
-        className="card"
+        className="card card-tap"
         style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, cursor: "pointer" }}
         onClick={() => navigate("/referral")}
       >
@@ -389,6 +409,7 @@ function StatCard({
   icon: string;
   accent?: string;
 }) {
+  const shown = useCountUp(value);
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
       <div style={{ fontSize: 22, marginBottom: 6 }}>{icon}</div>
@@ -396,7 +417,7 @@ function StatCard({
         className="bold"
         style={{ fontSize: 22, color: accent || "var(--text)" }}
       >
-        {value.toLocaleString()}
+        {shown.toLocaleString()}
       </div>
       <div className="text-xs text2">{label}</div>
     </div>

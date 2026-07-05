@@ -4,6 +4,7 @@ import type { Tariff, TributeProduct } from "@/entities/tariff";
 import { getTariffs, getTributeProducts } from "@/entities/tariff";
 import { BuyButton } from "@/features/buy-subscription";
 import { useApp } from "@/app/AppContext";
+import { Skeleton } from "@/shared/ui";
 
 function openSbpLink(url: string) {
   const tg = window.Telegram?.WebApp;
@@ -127,9 +128,20 @@ export function SubscriptionPage() {
 
         <div className="text-sm text2 mb-12">⭐ Оплата звёздами</div>
         {loading ? (
-          <div className="loading-center">
-            <div className="spinner" />
-          </div>
+          <>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="card" style={{ marginBottom: 12 }}>
+                <div className="row-between">
+                  <div style={{ flex: 1 }}>
+                    <Skeleton h={16} w="45%" />
+                    <Skeleton h={11} w="30%" style={{ marginTop: 8 }} />
+                  </div>
+                  <Skeleton h={20} w={64} />
+                </div>
+                <Skeleton h={46} style={{ marginTop: 12 }} />
+              </div>
+            ))}
+          </>
         ) : tariffs.length === 0 ? (
           <div className="empty-state">
             <div className="icon">😔</div>

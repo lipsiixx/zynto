@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { activateCode } from '@/entities/user'
+import { haptics } from '@/shared/lib/haptics'
 
 interface Props {
   onSuccess: (res: { type: string; message: string }) => void
@@ -17,9 +18,11 @@ export function ActivateForm({ onSuccess, onError }: Props) {
     setResult(null)
     try {
       const res = await activateCode(code.trim())
+      haptics.success()
       setResult(res)
       onSuccess(res)
     } catch (e) {
+      haptics.error()
       const msg = (e as Error).message
       const friendly =
         msg === 'code_not_found' ? 'Код не найден' :

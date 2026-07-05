@@ -508,6 +508,7 @@ export function NetworkPage() {
       {/* Node detail bottom sheet */}
       {selectedNode && (
         <div
+          className="sheet-backdrop"
           style={{
             position: "fixed",
             inset: 0,
@@ -519,6 +520,7 @@ export function NetworkPage() {
           onClick={() => setSelectedNode(null)}
         >
           <div
+            className="sheet"
             style={{
               background: "var(--bg-card)",
               borderRadius: "20px 20px 0 0",
@@ -656,6 +658,7 @@ export function NetworkPage() {
       {/* Graph settings bottom sheet */}
       {settingsOpen && (
         <div
+          className="sheet-backdrop"
           style={{
             position: "fixed",
             inset: 0,
@@ -667,6 +670,7 @@ export function NetworkPage() {
           onClick={() => setSettingsOpen(false)}
         >
           <div
+            className="sheet"
             style={{
               background: "var(--bg-card)",
               borderRadius: "20px 20px 0 0",

@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { ReferralStats } from '@/entities/referral'
 import { getReferral } from '@/entities/referral'
 import { useApp } from '@/app/AppContext'
+import { haptics } from '@/shared/lib/haptics'
+import { useCountUp } from '@/shared/lib/useCountUp'
 
 function daysLabel(n: number): string {
   if (n % 10 === 1 && n % 100 !== 11) return `${n} день`
@@ -11,6 +14,7 @@ function daysLabel(n: number): string {
 
 export function ReferralPage() {
   const { showToast } = useApp()
+  const navigate = useNavigate()
   const [data, setData] = useState<ReferralStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
@@ -22,9 +26,23 @@ export function ReferralPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  // Системная кнопка «Назад» Telegram — как на странице контакта
+  useEffect(() => {
+    const back = window.Telegram?.WebApp?.BackButton
+    if (!back) return
+    const onBack = () => navigate('/')
+    back.show()
+    back.onClick(onBack)
+    return () => {
+      back.offClick(onBack)
+      back.hide()
+    }
+  }, [navigate])
+
   const copyLink = () => {
     if (!data) return
     navigator.clipboard.writeText(data.link).then(() => {
+      haptics.success()
       setCopied(true)
       showToast('Ссылка скопирована!', 'success')
       setTimeout(() => setCopied(false), 2000)
@@ -33,6 +51,7 @@ export function ReferralPage() {
 
   const shareLink = () => {
     if (!data) return
+    haptics.tap()
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(data.link)}&text=${encodeURIComponent('Присоединяйся к Zynto — умный мониторинг удалённых сообщений!')}`
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tg = (window as any).Telegram?.WebApp
@@ -118,6 +137,7 @@ export function ReferralPage() {
 }
 
 function StatBox({ label, value, icon }: { label: string; value: number; icon: string }) {
+  const shown = useCountUp(value)
   return (
     <div
       style={{
@@ -128,7 +148,7 @@ function StatBox({ label, value, icon }: { label: string; value: number; icon: s
       }}
     >
       <div style={{ fontSize: 22, marginBottom: 4 }}>{icon}</div>
-      <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--purple-l)' }}>{value}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--purple-l)' }}>{shown}</div>
       <div className="text-xs text3" style={{ marginTop: 2 }}>{label}</div>
     </div>
   )

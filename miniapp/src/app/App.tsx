@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, lazy, Suspense } from 'react'
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { auth, getMe } from '@/entities/user'
 import type { Me } from '@/entities/user'
@@ -13,8 +13,12 @@ import { ContactDetailPage } from '@/pages/contact-detail'
 import { SubscriptionPage } from '@/pages/subscription'
 import { ActivatePage } from '@/pages/activate'
 import { ReferralPage } from '@/pages/referral'
-import { NetworkPage } from '@/pages/network'
 import { Ctx } from './AppContext'
+import { PageViewport } from './PageViewport'
+
+// react-force-graph-2d + d3 — большая часть бандла; грузим страницу «Сеть»
+// отдельным чанком только когда пользователь реально на неё заходит.
+const NetworkPage = lazy(() => import('@/pages/network').then(m => ({ default: m.NetworkPage })))
 
 // ── App ───────────────────────────────────────────────────────────────────
 
@@ -29,6 +33,8 @@ export default function App() {
   const showToast = useCallback((msg: string, type: 'success' | 'error' | 'info' = 'info') => {
     const id = Date.now()
     setToasts(t => [...t, { id, msg, type }])
+    // две фазы: за 300мс до удаления помечаем leaving → CSS-анимация выхода
+    setTimeout(() => setToasts(t => t.map(x => (x.id === id ? { ...x, leaving: true } : x))), 2700)
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000)
   }, [])
 
@@ -142,24 +148,35 @@ export default function App() {
       ) : (
         <Ctx.Provider value={{ me, refreshMe, showToast }}>
           <HashRouter>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/contacts" element={<ContactsPage />} />
-              <Route path="/contacts/:chatId" element={<ContactDetailPage />} />
-              <Route path="/subscription" element={<SubscriptionPage />} />
-              <Route path="/activate" element={<ActivatePage />} />
-              <Route path="/referral" element={<ReferralPage />} />
-              <Route path="/network" element={<NetworkPage />} />
-              {/* Админ-бандл монтирует свой собственный HashRouter в #x-root
-                  и использует hash-пути "/a/*". Оба роутера слушают один и тот же
-                  window.location.hash — без этого исключения catch-all ниже
-                  редиректил бы "/a/..." на "/", а админский catch-all редиректил
-                  бы обратно, зацикливая hashchange. Рендерим null и ничего не
-                  делаем — админский overlay поверх всего экрана всё равно
-                  скрывает этот (пустой) слой. */}
-              <Route path="/a/*" element={null} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+            <PageViewport>
+              <Suspense
+                fallback={
+                  <div className="loading-center" style={{ flex: 1 }}>
+                    <div className="spinner" />
+                  </div>
+                }
+              >
+                <Routes>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/contacts" element={<ContactsPage />} />
+                  <Route path="/contacts/:chatId" element={<ContactDetailPage />} />
+                  <Route path="/subscription" element={<SubscriptionPage />} />
+                  <Route path="/activate" element={<ActivatePage />} />
+                  <Route path="/referral" element={<ReferralPage />} />
+                  <Route path="/network" element={<NetworkPage />} />
+                  {/* Админ-бандл монтирует свой собственный HashRouter в #x-root
+                      и использует hash-пути "/a/*". Оба роутера слушают один и тот же
+                      window.location.hash — без этого исключения catch-all ниже
+                      редиректил бы "/a/..." на "/", а админский catch-all редиректил
+                      бы обратно, зацикливая hashchange. Рендерим null и ничего не
+                      делаем — админский overlay поверх всего экрана всё равно
+                      скрывает этот (пустой) слой. PageViewport для "/a/*" тоже
+                      рендерит детей без обёртки/анимации. */}
+                  <Route path="/a/*" element={null} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Suspense>
+            </PageViewport>
             <BottomNav />
             <Toast toasts={toasts} />
           </HashRouter>
