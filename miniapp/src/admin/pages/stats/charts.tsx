@@ -154,3 +154,37 @@ export function GrantsChart({ data }: { data: GrantPoint[] }) {
     </>
   )
 }
+
+/** Рейтинговая строка: имя + горизонтальный бар, ширина пропорциональна max. */
+export function RankRow({ rank, label, sublabel, value, max, extra, onClick }: {
+  rank: number
+  label: string
+  sublabel?: string
+  value: number
+  max: number
+  extra?: string
+  onClick?: () => void
+}) {
+  const pct = max > 0 ? Math.max(2, (value / max) * 100) : 0
+  return (
+    <div
+      onClick={onClick}
+      style={{ padding: '8px 0', cursor: onClick ? 'pointer' : undefined }}
+    >
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+        <span className="text-sm" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span className="text2" style={{ marginRight: 6 }}>{rank}.</span>
+          <span className="semibold">{label}</span>
+          {sublabel && <span className="text-xs text2" style={{ marginLeft: 6 }}>{sublabel}</span>}
+        </span>
+        <span className="text-sm semibold" style={{ flexShrink: 0 }}>
+          {value}
+          {extra && <span className="text-xs text2" style={{ marginLeft: 6 }}>{extra}</span>}
+        </span>
+      </div>
+      <div className="admin-progress-bar" style={{ height: 4, marginTop: 5 }}>
+        <div className="admin-progress-fill" style={{ width: `${pct}%`, background: CHART_COLORS.messages }} />
+      </div>
+    </div>
+  )
+}

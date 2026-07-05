@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getUserDailyStats, type UserDailyStatItem } from '@/admin/entities/stats'
+import { getUserDailyStats, getUserTopChats, type TopChatItem, type UserDailyStatItem } from '@/admin/entities/stats'
 import {
   findUser,
   getUserStats,
@@ -11,7 +11,7 @@ import {
 } from '@/admin/entities/manage-user'
 import { fmtDate, fmtDateTime } from '@/admin/shared/lib/format'
 import { SubBadge } from '@/admin/shared/ui'
-import { MessagesChart } from './charts'
+import { MessagesChart, RankRow } from './charts'
 
 const RANGES = [7, 30, 90] as const
 
@@ -35,6 +35,7 @@ export function UserStatsPage() {
   const [subs, setSubs] = useState<UserSubscriptionItem[]>([])
   const [days, setDays] = useState<number>(30)
   const [daily, setDaily] = useState<UserDailyStatItem[]>([])
+  const [topChats, setTopChats] = useState<TopChatItem[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -48,6 +49,7 @@ export function UserStatsPage() {
         setProfile(p)
         getUserStats(telegramId).then(setStats).catch(() => {})
         getUserSubscriptions(telegramId).then(res => setSubs(res.items)).catch(() => {})
+        getUserTopChats(telegramId).then(res => setTopChats(res.items)).catch(() => {})
       })
       .catch(e => setError((e as Error).message === 'user_not_found' ? 'Пользователь не найден' : (e as Error).message))
       .finally(() => setLoading(false))
@@ -123,6 +125,24 @@ export function UserStatsPage() {
           <div className="card">
             <MessagesChart data={daily} />
           </div>
+
+          {topChats.length > 0 && (
+            <>
+              <div className="admin-section-title">С кем общается больше всего</div>
+              <div className="card">
+                {topChats.map((c, i) => (
+                  <RankRow
+                    key={c.chat_id}
+                    rank={i + 1}
+                    label={c.title || `Чат ${c.chat_id}`}
+                    value={c.messages}
+                    max={topChats[0]?.messages ?? 0}
+                    extra={c.deleted || c.edited ? `удал. ${c.deleted} · изм. ${c.edited}` : undefined}
+                  />
+                ))}
+              </div>
+            </>
+          )}
 
           {stats && Object.keys(stats.payments.by_method).length > 0 && (
             <div className="text-xs text2" style={{ marginTop: 10 }}>

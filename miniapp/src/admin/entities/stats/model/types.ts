@@ -97,3 +97,20 @@ export interface UserDailyStatItem {
   deleted: number
   edited: number
 }
+
+/** GET /webapp/admin/stats/top-users */
+export interface TopUserItem {
+  telegram_id: number
+  full_name: string | null
+  username: string | null
+  messages: number
+}
+
+/** GET /webapp/admin/users/{tid}/top-chats */
+export interface TopChatItem {
+  chat_id: number
+  title: string | null
+  messages: number
+  deleted: number
+  edited: number
+}

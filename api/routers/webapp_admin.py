@@ -137,6 +137,29 @@ async def admin_stats_daily(
     }
 
 
+@router.get("/stats/top-users")
+async def admin_stats_top_users(
+    days: int = Query(7, ge=1, le=90),
+    limit: int = Query(10, ge=1, le=50),
+    _: int = Depends(require_webapp_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    return {"items": await admin_stats_q.top_active_users(db, days, limit)}
+
+
+@router.get("/users/{tid}/top-chats")
+async def admin_user_top_chats(
+    tid: int,
+    limit: int = Query(10, ge=1, le=50),
+    _: int = Depends(require_webapp_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    user = await users_q.get_user(db, tid)
+    if user is None:
+        raise HTTPException(status_code=404, detail="user_not_found")
+    return {"items": await admin_stats_q.top_chats_for_user(db, tid, limit)}
+
+
 @router.get("/users/{tid}/stats/daily")
 async def admin_user_stats_daily(
     tid: int,

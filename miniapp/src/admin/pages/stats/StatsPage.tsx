@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import {
   getDailyStats,
   getGlobalUserStats,
+  getTopUsers,
   type DailyStatItem,
   type GlobalUserStats,
+  type TopUserItem,
 } from '@/admin/entities/stats'
 import { listManagedUsers, type ManagedUsersListResponse } from '@/admin/entities/manage-user'
 import { Paginator, SubBadge } from '@/admin/shared/ui'
-import { CHART_COLORS, GrantsChart, MessagesChart, SingleBarChart } from './charts'
+import { CHART_COLORS, GrantsChart, MessagesChart, RankRow, SingleBarChart } from './charts'
 
 const RANGES = [7, 30, 90] as const
 const POLL_MS = 15000
@@ -22,6 +24,7 @@ export function StatsPage() {
   const [days, setDays] = useState<number>(30)
   const [daily, setDaily] = useState<DailyStatItem[]>([])
   const [dailyLoading, setDailyLoading] = useState(true)
+  const [topUsers, setTopUsers] = useState<TopUserItem[]>([])
 
   const [qInput, setQInput] = useState('')
   const [q, setQ] = useState('')
@@ -40,10 +43,10 @@ export function StatsPage() {
 
   const loadDaily = useCallback(() => {
     setDailyLoading(true)
-    getDailyStats(days)
-      .then(res => setDaily(res.items))
-      .catch(() => {})
-      .finally(() => setDailyLoading(false))
+    Promise.all([
+      getDailyStats(days).then(res => setDaily(res.items)).catch(() => {}),
+      getTopUsers(days).then(res => setTopUsers(res.items)).catch(() => {}),
+    ]).finally(() => setDailyLoading(false))
   }, [days])
 
   useEffect(() => {
@@ -106,6 +109,25 @@ export function StatsPage() {
       <div className="card">
         <GrantsChart data={daily} />
       </div>
+
+      {topUsers.length > 0 && (
+        <>
+          <div className="admin-section-title">Топ активных пользователей</div>
+          <div className="card">
+            {topUsers.map((u, i) => (
+              <RankRow
+                key={u.telegram_id}
+                rank={i + 1}
+                label={u.full_name || 'Без имени'}
+                sublabel={u.username ? `@${u.username}` : String(u.telegram_id)}
+                value={u.messages}
+                max={topUsers[0]?.messages ?? 0}
+                onClick={() => navigate(`/a/stats/user/${u.telegram_id}`)}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="admin-section-title">Статистика по пользователям</div>
       <div className="search-wrap" style={{ marginBottom: 10 }}>

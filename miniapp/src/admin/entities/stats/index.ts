@@ -9,8 +9,10 @@ export type {
   ProxyState,
   ProxyStats,
   ServerStats,
+  TopChatItem,
+  TopUserItem,
   UserDailyStatItem,
   WsEvent,
   WsEventName,
 } from './model/types'
-export { getDailyStats, getGlobalUserStats, getProxyStats, getServerStats, getUserDailyStats } from './api/statsApi'
+export { getDailyStats, getGlobalUserStats, getProxyStats, getServerStats, getTopUsers, getUserDailyStats, getUserTopChats } from './api/statsApi'

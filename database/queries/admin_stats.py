@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import case, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import MessageLog, Subscription, User
@@ -54,6 +54,61 @@ async def daily_messages(
             MessageLog.is_edited.is_(True), *user_filter_msg,
         ),
     }
+
+
+async def top_chats_for_user(db: AsyncSession, user_id: int, limit: int = 10) -> list[dict]:
+    """С кем пользователь больше всего общается — по числу залогированных сообщений."""
+    stmt = (
+        select(
+            MessageLog.chat_id,
+            func.max(MessageLog.chat_title).label("title"),
+            func.count().label("messages"),
+            func.sum(case((MessageLog.is_deleted.is_(True), 1), else_=0)).label("deleted"),
+            func.sum(case((MessageLog.is_edited.is_(True), 1), else_=0)).label("edited"),
+        )
+        .where(MessageLog.user_id == user_id)
+        .group_by(MessageLog.chat_id)
+        .order_by(desc("messages"))
+        .limit(limit)
+    )
+    res = await db.execute(stmt)
+    return [
+        {
+            "chat_id": row.chat_id,
+            "title": row.title,
+            "messages": int(row.messages),
+            "deleted": int(row.deleted or 0),
+            "edited": int(row.edited or 0),
+        }
+        for row in res
+    ]
+
+
+async def top_active_users(db: AsyncSession, days: int, limit: int = 10) -> list[dict]:
+    """Топ владельцев бизнес-аккаунтов по числу сообщений за период."""
+    stmt = (
+        select(
+            MessageLog.user_id,
+            func.max(User.full_name).label("full_name"),
+            func.max(User.username).label("username"),
+            func.count(MessageLog.id).label("messages"),
+        )
+        .join(User, User.telegram_id == MessageLog.user_id)
+        .where(MessageLog.received_at >= _since(days))
+        .group_by(MessageLog.user_id)
+        .order_by(desc("messages"))
+        .limit(limit)
+    )
+    res = await db.execute(stmt)
+    return [
+        {
+            "telegram_id": row.user_id,
+            "full_name": row.full_name,
+            "username": row.username,
+            "messages": int(row.messages),
+        }
+        for row in res
+    ]
 
 
 async def daily_payments(db: AsyncSession, days: int) -> dict[str, dict[str, int]]:
