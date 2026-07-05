@@ -100,12 +100,18 @@ async def global_user_stats(db: AsyncSession = Depends(get_db)) -> GlobalUserSta
     )
     online = int(online_res.scalar() or 0)
 
+    referral_res = await db.execute(
+        select(func.count(User.id)).where(User.referred_by.isnot(None))
+    )
+    referral_users = int(referral_res.scalar() or 0)
+
     return GlobalUserStatsOut(
         total=total,
         online=online,
         newToday=new_today,
         newThisWeek=new_week,
         activeSubscribers=active,
+        referralUsers=referral_users,
         measuredAt=now,
     )
 

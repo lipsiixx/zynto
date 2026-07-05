@@ -32,6 +32,7 @@ def main_menu(subscribed: bool = True, connected: bool = False) -> InlineKeyboar
     if not subscribed:
         kb.button(text="❓ Как это работает", callback_data="how")
     kb.button(text="ℹ️ О боте", callback_data="about")
+    kb.button(text="👥 Пригласить друга", callback_data="referral")
     kb.adjust(1)
     _add_stars_premium(kb)
     return kb.as_markup()
@@ -40,6 +41,7 @@ def main_menu(subscribed: bool = True, connected: bool = False) -> InlineKeyboar
 def main_menu_sub() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(_miniapp_button())
+    kb.button(text="👥 Пригласить друга", callback_data="referral")
     kb.adjust(1)
     return kb.as_markup()
 

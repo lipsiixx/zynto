@@ -358,6 +358,22 @@ export function HomePage() {
           </button>
         </>
       )}
+
+      {/* Реферальная программа — доступна всем, и без подписки */}
+      <div
+        className="card"
+        style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, cursor: "pointer" }}
+        onClick={() => navigate("/referral")}
+      >
+        <div style={{ fontSize: 26, flexShrink: 0 }}>👥</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="semibold text-sm">Пригласи друга</div>
+          <div className="text-xs text3">
+            Получай бесплатные дни за каждую оплату по твоей ссылке
+          </div>
+        </div>
+        <div className="text3" style={{ fontSize: 18, flexShrink: 0 }}>›</div>
+      </div>
     </div>
   );
 }

@@ -85,6 +85,7 @@ export function StatsPage() {
         <StatCard label="Новых сегодня" value={userStats?.newToday} color="var(--purple-l)" />
         <StatCard label="Новых за неделю" value={userStats?.newThisWeek} color="var(--purple-l)" />
         <StatCard label="Активных подписок" value={userStats?.activeSubscribers} color="var(--green)" />
+        <StatCard label="Пришли по ссылке" value={userStats?.referralUsers} color="var(--purple-l)" />
       </div>
 
       <div className="tabs" style={{ marginTop: 12 }}>

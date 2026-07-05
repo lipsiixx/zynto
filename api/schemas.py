@@ -299,6 +299,7 @@ class GlobalUserStatsOut(BaseModel):
     newToday: int
     newThisWeek: int
     activeSubscribers: int
+    referralUsers: int = 0
     measuredAt: datetime
 
 

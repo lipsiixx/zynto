@@ -53,6 +53,8 @@ export interface GlobalUserStats {
   newToday: number
   newThisWeek: number
   activeSubscribers: number
+  /** Пользователи, пришедшие по реферальной ссылке (referred_by != null) */
+  referralUsers?: number
   measuredAt: string
 }
 
