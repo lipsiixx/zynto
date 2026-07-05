@@ -222,6 +222,39 @@
   background: var(--purple-l);
 }
 
+.admin-event-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.admin-event-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+  min-width: 0;
+}
+
+.admin-event-thumb {
+  height: 40px;
+  max-width: 64px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.admin-event-media { flex-shrink: 0; }
+
+.admin-event-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text2);
+}
+
 .admin-event-item.new .admin-event-dot { background: var(--green); }
 .admin-event-item.updated .admin-event-dot { background: var(--yellow); }
 .admin-event-item.deleted .admin-event-dot { background: var(--red); }

@@ -232,6 +232,8 @@ async def on_business_message(message: Message, db: AsyncSession, bot: Bot) -> N
         "chatTitle": chat_title(message),
         "isOutgoing": is_outgoing,
         "text": (data.text_content or "")[:80] or None,
+        "fileUniqueId": data.file_unique_id,
+        "mimeType": data.mime_type,
     }))
 
     # Если ответ на сообщение — пытаемся перехватить view-once медиа из reply_to_message

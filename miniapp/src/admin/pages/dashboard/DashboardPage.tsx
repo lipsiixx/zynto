@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import { reqLegacy } from '@/admin/shared/api/adminApi'
+import { mediaUrl, reqLegacy } from '@/admin/shared/api/adminApi'
 import { useAdminWs } from '@/admin/shared/lib/useAdminWs'
-import { formatBytes, formatRelTime, formatUptime, proxyStateLabel } from '@/admin/shared/lib/format'
+import {
+  formatBytes,
+  formatRelTime,
+  formatUptime,
+  MSG_TYPE_ICON,
+  MSG_TYPE_LABEL,
+  proxyStateLabel,
+} from '@/admin/shared/lib/format'
 import {
   getGlobalUserStats,
   getProxyStats,
@@ -193,27 +200,81 @@ export function DashboardPage() {
           </div>
         ) : (
           <div className="admin-event-feed">
-            {events.map((ev) => {
-              const meta = EVENT_LABELS[ev.event] || { label: ev.event, cls: 'system' }
-              const d = ev.data
-              return (
-                <div key={ev._id} className={`admin-event-item ${meta.cls}`}>
-                  <span className="admin-event-dot" />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ fontWeight: 500 }}>{meta.label}</span>
-                    <span className="text3" style={{ marginLeft: 8 }}>
-                      {typeof d.telegramUserId !== 'undefined' && `user:${d.telegramUserId}`}
-                      {typeof d.chatId !== 'undefined' && ` chat:${d.chatId}`}
-                      {typeof d.messageType === 'string' && ` (${d.messageType})`}
-                    </span>
-                  </div>
-                  <span className="text3">{new Date(ev._receivedAt).toLocaleTimeString('ru-RU')}</span>
-                </div>
-              )
-            })}
+            {events.map((ev) => (
+              <FeedItem key={ev._id} ev={ev} />
+            ))}
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// Строка Live-ленты: «кто → кому» + содержимое (текст или медиа с миниатюрой).
+// Старые события без обогащённых полей падают обратно на user:/chat:-идентификаторы.
+function FeedItem({ ev }: { ev: FeedEvent }) {
+  const meta = EVENT_LABELS[ev.event] || { label: ev.event, cls: 'system' }
+  const d = ev.data
+  const str = (v: unknown): string | null => (typeof v === 'string' && v ? v : null)
+
+  const owner = str(d.ownerName)
+  const sender = str(d.senderName)
+  const chat = str(d.chatTitle)
+  const mt = str(d.messageType)
+  const text = str(d.text)
+  const fuid = str(d.fileUniqueId)
+  const mime = str(d.mimeType) || ''
+
+  // Владелец пишет сам (isOutgoing) или сам правит/удаляет своё — стрелка от него к чату
+  const ownerIsAuthor = d.isOutgoing === true || (sender !== null && sender === owner)
+  const direction = owner
+    ? ownerIsAuthor
+      ? { from: owner, to: chat ?? 'собеседник' }
+      : { from: sender ?? chat ?? 'собеседник', to: owner }
+    : null
+
+  const isImg = !!fuid && (mt === 'photo' || mt === 'sticker' || mime.startsWith('image/'))
+  const mediaLabel = mt && mt !== 'text' ? `${MSG_TYPE_ICON[mt] || '📎'} ${MSG_TYPE_LABEL[mt] || mt}` : null
+
+  return (
+    <div className={`admin-event-item ${meta.cls}`}>
+      <span className="admin-event-dot" />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="admin-event-head">
+          <span style={{ fontWeight: 500 }}>{meta.label}</span>
+          {direction ? (
+            <span className="text2">
+              <span className="semibold">{direction.from}</span>
+              {' → '}
+              <span className="semibold">{direction.to}</span>
+            </span>
+          ) : (
+            <span className="text3">
+              {typeof d.telegramUserId !== 'undefined' && `user:${d.telegramUserId}`}
+              {typeof d.chatId !== 'undefined' && ` chat:${d.chatId}`}
+              {mt && ` (${mt})`}
+            </span>
+          )}
+        </div>
+        {(text || mediaLabel) && (
+          <div className="admin-event-body">
+            {isImg && fuid && (
+              <img
+                className="admin-event-thumb"
+                src={mediaUrl(fuid)}
+                alt=""
+                loading="lazy"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+            )}
+            {mediaLabel && <span className="text2 admin-event-media">{mediaLabel}</span>}
+            {text && <span className="admin-event-text">«{text}»</span>}
+          </div>
+        )}
+      </div>
+      <span className="text3">{new Date(ev._receivedAt).toLocaleTimeString('ru-RU')}</span>
     </div>
   )
 }

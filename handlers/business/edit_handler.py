@@ -85,5 +85,7 @@ async def on_edited_business_message(message: Message, db: AsyncSession, bot: Bo
         "senderName": record.sender_name,
         "chatTitle": record.chat_title,
         "text": (data.text_content or "")[:80] or None,
+        "fileUniqueId": record.file_unique_id,
+        "mimeType": record.mime_type,
     }))
     await get_notifier().notify_edited(owner.telegram_id, record)

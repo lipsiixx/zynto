@@ -103,6 +103,21 @@ export function initials(name: string | null | undefined): string {
     .join('')
 }
 
+export const MSG_TYPE_LABEL: Record<string, string> = {
+  text: 'текст',
+  photo: 'фото',
+  video: 'видео',
+  audio: 'аудио',
+  voice: 'голосовое',
+  document: 'документ',
+  sticker: 'стикер',
+  animation: 'GIF',
+  video_note: 'кружок',
+  contact: 'контакт',
+  location: 'локация',
+  poll: 'опрос',
+}
+
 export const MSG_TYPE_ICON: Record<string, string> = {
   text: '💬',
   photo: '🖼',

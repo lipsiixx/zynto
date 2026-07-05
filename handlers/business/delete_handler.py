@@ -49,5 +49,7 @@ async def on_deleted_business_messages(
             "chatTitle": record.chat_title,
             "messageType": record.message_type,
             "text": (record.text_content or "")[:80] or None,
+            "fileUniqueId": record.file_unique_id,
+            "mimeType": record.mime_type,
         }))
         await notifier.notify_deleted(owner.telegram_id, record)
