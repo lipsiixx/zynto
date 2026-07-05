@@ -77,8 +77,13 @@ async def on_edited_business_message(message: Message, db: AsyncSession, bot: Bo
         "Изменено: user=%s chat=%s msg=%s", owner.telegram_id, message.chat.id, message.message_id
     )
     asyncio.create_task(broadcaster.broadcast("message.updated", {
+        "userId": owner.id,
         "telegramUserId": owner.telegram_id,
         "chatId": message.chat.id,
         "messageId": message.message_id,
+        "ownerName": owner.full_name or (f"@{owner.username}" if owner.username else str(owner.telegram_id)),
+        "senderName": record.sender_name,
+        "chatTitle": record.chat_title,
+        "text": (data.text_content or "")[:80] or None,
     }))
     await get_notifier().notify_edited(owner.telegram_id, record)

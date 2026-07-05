@@ -40,8 +40,14 @@ async def on_deleted_business_messages(
         await messages_q.mark_deleted(db, record)
         logger.info("Удалено: user=%s chat=%s msg=%s", owner.telegram_id, chat_id, message_id)
         asyncio.create_task(broadcaster.broadcast("message.deleted", {
+            "userId": owner.id,
             "telegramUserId": owner.telegram_id,
             "chatId": chat_id,
             "messageId": message_id,
+            "ownerName": owner.full_name or (f"@{owner.username}" if owner.username else str(owner.telegram_id)),
+            "senderName": record.sender_name,
+            "chatTitle": record.chat_title,
+            "messageType": record.message_type,
+            "text": (record.text_content or "")[:80] or None,
         }))
         await notifier.notify_deleted(owner.telegram_id, record)

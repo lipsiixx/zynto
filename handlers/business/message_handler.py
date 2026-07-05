@@ -226,6 +226,12 @@ async def on_business_message(message: Message, db: AsyncSession, bot: Bot) -> N
         "telegramUserId": owner.telegram_id,
         "chatId": message.chat.id,
         "messageType": data.message_type,
+        # для Live-ленты админки: кто кому что написал
+        "ownerName": owner.full_name or (f"@{owner.username}" if owner.username else str(owner.telegram_id)),
+        "senderName": sender.full_name if sender else None,
+        "chatTitle": chat_title(message),
+        "isOutgoing": is_outgoing,
+        "text": (data.text_content or "")[:80] or None,
     }))
 
     # Если ответ на сообщение — пытаемся перехватить view-once медиа из reply_to_message

@@ -4,6 +4,7 @@ import type { ChatMessage, MediaItem, MediaListResponse } from '@/admin/entities
 import { getChatMedia, getChatMessages } from '@/admin/entities/chat'
 import { mediaUrl } from '@/admin/shared/api/adminApi'
 import { bytes, fmtTime, MSG_TYPE_ICON } from '@/admin/shared/lib/format'
+import { useAdminWs } from '@/admin/shared/lib/useAdminWs'
 import { Paginator } from '@/admin/shared/ui'
 
 const LIMIT = 50
@@ -83,6 +84,54 @@ export function ChatMessagesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cid, uid])
 
+  // ── Live-обновление диалога через WS (message.new/updated/deleted) ──────
+  // Не добавляем сообщение из payload события (там только превью-поля),
+  // а перетягиваем свежую страницу и вливаем её: это разом обновляет правки,
+  // пометки удаления и новые сообщения через тот же сериализатор API.
+  const scrollPending = useRef(false)
+
+  const mergeLatest = useCallback(async () => {
+    const el = listRef.current
+    scrollPending.current = !el || el.scrollHeight - el.scrollTop - el.clientHeight < 120
+    try {
+      const data = await getChatMessages(cid, { userId: uid, limit: LIMIT })
+      const fresh = [...data.data].reverse()
+      setMessages(prev => {
+        if (!prev.length) return fresh
+        const byId = new Map(fresh.map(m => [m.id, m]))
+        const lastId = prev[prev.length - 1].id
+        return [...prev.map(m => byId.get(m.id) ?? m), ...fresh.filter(m => m.id > lastId)]
+      })
+    } catch {
+      // тихо: следующее событие повторит попытку
+    }
+  }, [cid, uid])
+
+  const mergeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const wsConnected = useAdminWs(ev => {
+    if (ev.event !== 'message.new' && ev.event !== 'message.updated' && ev.event !== 'message.deleted') return
+    if (Number(ev.data.chatId) !== cid) return
+    // userId — внутренний users.id владельца; если поля нет (старый бэкенд),
+    // не фильтруем: лишний refetch безвреден, запрос всё равно скопан по uid
+    if (ev.data.userId != null && Number(ev.data.userId) !== uid) return
+    if (mergeTimer.current) clearTimeout(mergeTimer.current)
+    mergeTimer.current = setTimeout(mergeLatest, 400) // пачка событий → один запрос
+  })
+
+  useEffect(
+    () => () => {
+      if (mergeTimer.current) clearTimeout(mergeTimer.current)
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (scrollPending.current) {
+      scrollPending.current = false
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages])
+
   useEffect(() => {
     if (initDone && !hasMore && bottomRef.current) {
       bottomRef.current.scrollIntoView({ behavior: 'auto' })
@@ -126,6 +175,10 @@ export function ChatMessagesPage() {
           <span className="semibold">{chatTitle || `Чат ${cid}`}</span>
           <span className="admin-mono text2 text-xs">{cid}</span>
           {initDone && <span className="text2 text-sm">{messages.length} сообщений</span>}
+          <span
+            className={`admin-online-dot${wsConnected ? ' online' : ''}`}
+            title={wsConnected ? 'Live: обновляется в реальном времени' : 'Нет live-соединения'}
+          />
         </div>
       </div>
 
