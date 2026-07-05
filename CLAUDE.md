@@ -16,7 +16,8 @@ Telegram-бот (@zynto_bot) на **aiogram 3** / Python 3.12. Перехват�
 | `migrate` | `alembic upgrade head` локально |
 | `db-reset` | пересоздать локальную БД с нуля + миграции |
 | `syntax` | `compileall` — проверка синтаксиса |
-| `deploy` / `push` | сборка UI + push + деплой на сервер |
+| `deploy` | полный деплой: сборка UI → авто-коммит `static/` → push → pull на сервере → `docker compose up -d --build` → миграции → логи |
+| `push` | только `git push origin main` (без сборки и деплоя) |
 | `logs` | tail локального `logs/bot.log` (`-Wait -Tail 60`) |
 | `ssh` | SSH-сессия на сервер |
 | `server-logs` / `server-restart` / `server-status` / `server-migrate` / `server-update-pat` | операции на сервере |
@@ -25,7 +26,7 @@ Telegram-бот (@zynto_bot) на **aiogram 3** / Python 3.12. Перехват�
 
 ```powershell
 .\venv\Scripts\python.exe main.py                      # запуск polling
-.\venv\Scripts\python.exe -m compileall -q .           # синтаксис (без venv)
+.\venv\Scripts\python.exe -m compileall -q . -x "venv|__pycache__"  # синтаксис
 .\venv\Scripts\python.exe -m alembic upgrade head      # применить миграции
 .\venv\Scripts\python.exe -m alembic revision --autogenerate -m "описание"  # новая миграция
 ```
@@ -47,6 +48,8 @@ Telegram-бот (@zynto_bot) на **aiogram 3** / Python 3.12. Перехват�
 
 Порядок включения роутеров в Dispatcher: **business → admin → user** (важно для приоритета).
 
+Polling подписан только на типы апдейтов из `ALLOWED_UPDATES` в `main.py` — новый тип апдейта (например, реакции) не будет приходить, пока не добавлен в этот список.
+
 ### Слои
 
 | Слой | Путь | Правило |
@@ -65,8 +68,9 @@ Telegram-бот (@zynto_bot) на **aiogram 3** / Python 3.12. Перехват�
 
 1. `DatabaseMiddleware` — outer, все апдейты → добавляет `db` (AsyncSession) в `data`.
 2. `AuthMiddleware` — только user-роутер → `get_or_create_user`, проверка бана, истечение подписки → добавляет `user` в `data`.
-3. `ThrottleMiddleware` — только user-роутер, Redis, пропускает `successful_payment`.
-4. `AdminCheckMiddleware` — только admin-роутер.
+3. `ChannelSubscriptionMiddleware` — только user-роутер, строго после Auth (нужен `data["user"]`) → блокирует неподписанных на канал (см. «Обязательная подписка» ниже).
+4. `ThrottleMiddleware` — только user-роутер, Redis, пропускает `successful_payment`.
+5. `AdminCheckMiddleware` — только admin-роутер.
 
 **Бизнес-роутер без auth/throttle** — у business-апдейтов нет `from_user`-контекста.
 
