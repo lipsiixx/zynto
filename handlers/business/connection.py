@@ -33,10 +33,7 @@ async def on_business_connection(event: BusinessConnection, db: AsyncSession, bo
 
     if is_enabled:
         logger.info("Бизнес-аккаунт подключён: user=%s bc=%s", owner.id, bc_id)
-        text = (
-            "✅ <b>Мониторинг подключён!</b> Теперь я слежу за твоей перепиской "
-            "и сообщу, если кто-то удалит или изменит сообщение."
-        )
+        text = "✅ <b>Мониторинг подключён!</b>"
     else:
         logger.info("Бизнес-аккаунт отключён: user=%s bc=%s", owner.id, bc_id)
         text = "⚠️ <b>Мониторинг отключён.</b> Ты убрал бота из бизнес-настроек."
