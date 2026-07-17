@@ -6,13 +6,17 @@ import type { WsEvent } from '@/admin/entities/stats'
  * Подписка на GET /v1/ws — реалтайм-события бота (message.new/updated/deleted,
  * stats.refresh, cache.invalidated). Автопереподключение через 3с после
  * закрытия сокета — порт поведения Dashboard.jsx из старого admin-panel.
+ *
+ * @param enabled false — сокет вообще не поднимается (например, урезанный
+ * доступ без вкладки Live-событий на дашборде, см. DashboardPage).
  */
-export function useAdminWs(onEvent: (ev: WsEvent) => void): boolean {
+export function useAdminWs(onEvent: (ev: WsEvent) => void, enabled = true): boolean {
   const [connected, setConnected] = useState(false)
   const onEventRef = useRef(onEvent)
   onEventRef.current = onEvent
 
   useEffect(() => {
+    if (!enabled) return
     const token = getToken()
     if (!token) return
 
@@ -57,7 +61,7 @@ export function useAdminWs(onEvent: (ev: WsEvent) => void): boolean {
       if (reconnectTimer) clearTimeout(reconnectTimer)
       ws?.close()
     }
-  }, [])
+  }, [enabled])
 
   return connected
 }

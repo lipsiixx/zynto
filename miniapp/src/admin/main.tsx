@@ -5,6 +5,9 @@ import './styles.css'
 
 interface MountCtx {
   token: string
+  /** true — вход через /admin (?admin_entry=full), полный доступ ко всем разделам;
+   *  false — вход через Start/меню, урезанный доступ (см. RoleChooser → AdminApp). */
+  fullAccess: boolean
 }
 
 function AdminRoot({ ctx }: { ctx: MountCtx }) {
@@ -20,7 +23,7 @@ function AdminRoot({ ctx }: { ctx: MountCtx }) {
 
   if (dismissed) return null
 
-  return <RoleChooser token={ctx.token} onDismiss={handleDismiss} />
+  return <RoleChooser token={ctx.token} fullAccess={ctx.fullAccess} onDismiss={handleDismiss} />
 }
 
 function mount(container: HTMLElement, ctx: MountCtx): () => void {

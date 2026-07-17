@@ -4,11 +4,13 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import time
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl
 
 import jwt
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from config import settings
@@ -18,6 +20,25 @@ _TTL_DAYS = 7
 _USER_TTL_HOURS = 24
 
 router = APIRouter(tags=["auth"])
+
+# /auth/login — единственный вход в легаси admin-панель по паролю (без привязки
+# к Telegram-аккаунту), значит без защиты от подбора это просто угадывание
+# API_PASSWORD. Простой in-memory rate-limit по IP — процесс один (uvicorn без
+# нескольких воркеров), так что общий словарь в памяти достаточен.
+_LOGIN_MAX_ATTEMPTS = 5
+_LOGIN_WINDOW_SECONDS = 300
+_login_attempts: dict[str, list[float]] = defaultdict(list)
+
+
+def _login_rate_limited(ip: str) -> bool:
+    now = time.monotonic()
+    attempts = _login_attempts[ip]
+    attempts[:] = [t for t in attempts if now - t < _LOGIN_WINDOW_SECONDS]
+    return len(attempts) >= _LOGIN_MAX_ATTEMPTS
+
+
+def _register_failed_login(ip: str) -> None:
+    _login_attempts[ip].append(time.monotonic())
 
 
 class LoginRequest(BaseModel):
@@ -51,8 +72,12 @@ def verify_token(token: str) -> bool:
 
 
 @router.post("/auth/login", response_model=TokenResponse)
-async def login(body: LoginRequest) -> TokenResponse:
+async def login(body: LoginRequest, request: Request) -> TokenResponse:
+    ip = request.client.host if request.client else "unknown"
+    if _login_rate_limited(ip):
+        raise HTTPException(status_code=429, detail="too_many_attempts")
     if not settings.api_password or body.password != settings.api_password:
+        _register_failed_login(ip)
         raise HTTPException(status_code=401, detail="invalid_password")
     token, exp = create_token()
     return TokenResponse(token=token, expiresAt=exp)

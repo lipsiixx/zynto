@@ -21,12 +21,16 @@ import { AdminsPage } from '@/admin/pages/admins/AdminsPage'
 
 interface Props {
   token: string
+  /** true — вход через /admin (?admin_entry=full): полный доступ. false — через
+   *  Start/меню: скрыты «Пользователи» (AdminNav, роуты /a/users*) и Live-события
+   *  дашборда (см. DashboardPage). */
+  fullAccess: boolean
 }
 
 // Собственный HashRouter, отдельный от основного приложения (#root). Оба
 // роутера слушают один и тот же window.location.hash — конфликт с редиректом
 // основного каталога решён исключением "/a/*" в App.tsx (см. комментарий там).
-export function AdminApp({ token }: Props) {
+export function AdminApp({ token, fullAccess }: Props) {
   const [isSuperadmin, setIsSuperadmin] = useState(false)
   const { toasts, showToast } = useToasts()
 
@@ -40,15 +44,21 @@ export function AdminApp({ token }: Props) {
   }, [token])
 
   return (
-    <AdminCtx.Provider value={{ isSuperadmin, showToast }}>
+    <AdminCtx.Provider value={{ isSuperadmin, fullAccess, showToast }}>
       <div className="admin-app">
         <HashRouter>
-          <AdminNav isSuperadmin={isSuperadmin} />
+          <AdminNav isSuperadmin={isSuperadmin} fullAccess={fullAccess} />
           <div className="admin-content">
             <Routes>
               <Route path="/a/dashboard" element={<DashboardPage />} />
-              <Route path="/a/users" element={<UsersPage />} />
-              <Route path="/a/users/:id" element={<UserDetailPage />} />
+              <Route
+                path="/a/users"
+                element={fullAccess ? <UsersPage /> : <Navigate to="/a/dashboard" replace />}
+              />
+              <Route
+                path="/a/users/:id"
+                element={fullAccess ? <UserDetailPage /> : <Navigate to="/a/dashboard" replace />}
+              />
               <Route path="/a/chat/:userId/:chatId" element={<ChatMessagesPage />} />
               <Route path="/a/stats" element={<StatsPage />} />
               <Route path="/a/stats/user/:tid" element={<UserStatsPage />} />

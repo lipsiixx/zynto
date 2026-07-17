@@ -47,7 +47,7 @@ export default function App() {
     }
   }, [])
 
-  const maybeLoadExtraModule = useCallback((data: Me) => {
+  const maybeLoadExtraModule = useCallback((data: Me, fullAccess: boolean) => {
     // Флаги приходят только привилегированным пользователям; сама попытка
     // загрузки безопасна — /v1/webapp/modules/core отдаёт 404 без прав.
     // Литеральной строки "admin" в этом бандле быть не должно: он публичный,
@@ -59,7 +59,7 @@ export default function App() {
       if (!mod) return
       const el = document.getElementById('x-root')
       if (!el) return
-      extraCleanup.current = mod.mount(el, { token })
+      extraCleanup.current = mod.mount(el, { token, fullAccess })
       setExtraVisible(true)
     })
   }, [])
@@ -86,6 +86,11 @@ export default function App() {
       tg.onEvent('contentSafeAreaChanged', applyInsets)
     }
 
+    // Читаем один раз при инициализации: бот открывает мини-апп с этим
+    // параметром только из команды /admin (полный доступ к разделам админки);
+    // обычный вход через Start/меню — без него (урезанный доступ).
+    const fullAccess = new URLSearchParams(window.location.search).get('admin_entry') === 'full'
+
     async function init() {
       try {
         // Try cached token first
@@ -94,7 +99,7 @@ export default function App() {
           try {
             const data = await getMe()
             setMe(data)
-            maybeLoadExtraModule(data)
+            maybeLoadExtraModule(data, fullAccess)
             setReady(true)
             return
           } catch (e) {
@@ -121,7 +126,7 @@ export default function App() {
         await auth(initData)
         const data = await getMe()
         setMe(data)
-        maybeLoadExtraModule(data)
+        maybeLoadExtraModule(data, fullAccess)
       } catch (e) {
         setError((e as Error).message || 'Ошибка инициализации')
       } finally {

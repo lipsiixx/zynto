@@ -137,6 +137,15 @@ class Settings:
             raise RuntimeError("BOT_TOKEN не задан в .env")
         if not self.database_url:
             raise RuntimeError("DATABASE_URL не задан в .env")
+        # api_secret подписывает JWT (admin-токены и webapp user/admin токены).
+        # Дефолт "change-me-in-production" — публичная строка в открытом репозитории,
+        # с ней любой мог бы сам подписать себе admin-токен или user-токен под
+        # произвольным telegram_id. Разрешаем дефолт только если API вообще выключен.
+        if self.api_enabled and self.api_secret == "change-me-in-production":
+            raise RuntimeError(
+                "API_SECRET не задан в .env (используется публичный дефолт) при включённом API_ENABLED — "
+                "задай случайный секрет, иначе JWT (в т.ч. админские) можно подделать"
+            )
 
 
 settings = Settings()

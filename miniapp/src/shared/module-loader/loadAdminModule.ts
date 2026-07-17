@@ -1,5 +1,5 @@
 export interface LoadedModule {
-  mount: (el: HTMLElement, ctx: { token: string }) => () => void
+  mount: (el: HTMLElement, ctx: { token: string; fullAccess: boolean }) => () => void
 }
 
 export async function loadAdminModule(token: string): Promise<LoadedModule | null> {

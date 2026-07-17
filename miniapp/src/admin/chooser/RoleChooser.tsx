@@ -3,15 +3,16 @@ import { AdminApp } from '@/admin/app/AdminApp'
 
 interface Props {
   token: string
+  fullAccess: boolean
   onDismiss: () => void
 }
 
 // Показывается при каждой холодной загрузке админ-бандла (см. main.tsx).
-export function RoleChooser({ token, onDismiss }: Props) {
+export function RoleChooser({ token, fullAccess, onDismiss }: Props) {
   const [asAdmin, setAsAdmin] = useState(false)
 
   if (asAdmin) {
-    return <AdminApp token={token} />
+    return <AdminApp token={token} fullAccess={fullAccess} />
   }
 
   return (

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { mediaUrl, reqLegacy } from '@/admin/shared/api/adminApi'
 import { useAdminWs } from '@/admin/shared/lib/useAdminWs'
+import { useAdminCtx } from '@/admin/shared/lib/AdminCtx'
 import {
   formatBytes,
   formatRelTime,
@@ -35,6 +36,7 @@ const SERVER_POLL_MS = 15000
 let _feedIdCounter = 0
 
 export function DashboardPage() {
+  const { fullAccess } = useAdminCtx()
   const [userStats, setUserStats] = useState<GlobalUserStats | null>(null)
   const [serverStats, setServerStats] = useState<ServerStats | null>(null)
   const [serverLoading, setServerLoading] = useState(true)
@@ -64,7 +66,9 @@ export function DashboardPage() {
   const handleWsEvent = useCallback((ev: WsEvent) => {
     setEvents((prev) => [{ ...ev, _id: ++_feedIdCounter, _receivedAt: Date.now() }, ...prev].slice(0, MAX_EVENTS))
   }, [])
-  const wsConnected = useAdminWs(handleWsEvent)
+  // Урезанный доступ (вход через Start/меню, без ?admin_entry=full) — Live-лента
+  // скрыта, поэтому сокет вообще не поднимаем.
+  const wsConnected = useAdminWs(handleWsEvent, fullAccess)
 
   const invalidateCache = useCallback(() => {
     setInvalidating(true)
@@ -83,10 +87,12 @@ export function DashboardPage() {
           <h1 style={{ marginBottom: 2 }}>Дашборд</h1>
           <p className="text2 text-sm">Общее состояние бота @zynto_bot</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className={`admin-dot ${wsConnected ? 'ok' : 'down'}`} />
-          <span className="text2 text-sm">{wsConnected ? 'WS подключён' : 'WS отключён'}</span>
-        </div>
+        {fullAccess && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className={`admin-dot ${wsConnected ? 'ok' : 'down'}`} />
+            <span className="text2 text-sm">{wsConnected ? 'WS подключён' : 'WS отключён'}</span>
+          </div>
+        )}
       </div>
 
       {/* Stat cards */}
@@ -180,32 +186,34 @@ export function DashboardPage() {
         </>
       )}
 
-      {/* Live events */}
-      <div className="card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <span style={{ fontWeight: 600, fontSize: 14 }}>Live-события</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="text-sm text2">{events.length} событий</span>
-            <button className="admin-icon-btn" onClick={invalidateCache} disabled={invalidating}>
-              {invalidating ? '...' : '↻ Сбросить кэш'}
-            </button>
-          </div>
-        </div>
-        {events.length === 0 ? (
-          <div className="empty-state" style={{ padding: '24px 0' }}>
-            <div style={{ fontSize: 13, color: 'var(--text2)' }}>Ожидание событий...</div>
-            <div className="text-sm text3" style={{ marginTop: 4 }}>
-              Сообщения появятся при активности пользователей
+      {/* Live events — только при полном доступе (вход через /admin ?admin_entry=full) */}
+      {fullAccess && (
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ fontWeight: 600, fontSize: 14 }}>Live-события</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span className="text-sm text2">{events.length} событий</span>
+              <button className="admin-icon-btn" onClick={invalidateCache} disabled={invalidating}>
+                {invalidating ? '...' : '↻ Сбросить кэш'}
+              </button>
             </div>
           </div>
-        ) : (
-          <div className="admin-event-feed">
-            {events.map((ev) => (
-              <FeedItem key={ev._id} ev={ev} />
-            ))}
-          </div>
-        )}
-      </div>
+          {events.length === 0 ? (
+            <div className="empty-state" style={{ padding: '24px 0' }}>
+              <div style={{ fontSize: 13, color: 'var(--text2)' }}>Ожидание событий...</div>
+              <div className="text-sm text3" style={{ marginTop: 4 }}>
+                Сообщения появятся при активности пользователей
+              </div>
+            </div>
+          ) : (
+            <div className="admin-event-feed">
+              {events.map((ev) => (
+                <FeedItem key={ev._id} ev={ev} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
