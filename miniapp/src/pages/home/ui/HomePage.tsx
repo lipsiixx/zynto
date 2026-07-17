@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/app/AppContext";
 import { getInstructionPhotoUrl } from "@/entities/message";
+import { HistoryRetentionControl } from "@/features/history-retention";
 import { useCountUp } from "@/shared/lib/useCountUp";
 import { Skeleton } from "@/shared/ui";
 
@@ -187,6 +188,41 @@ function HowToConnect() {
   );
 }
 
+function HistoryRetentionCard({
+  hours,
+  onSaved,
+  showToast,
+}: {
+  hours: number;
+  onSaved: (hours: number) => void;
+  showToast: (msg: string, type?: "success" | "error" | "info") => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <button className="how-connect-toggle" onClick={() => setOpen((o) => !o)}>
+        <span>⚙️ Срок хранения</span>
+        <span className={`how-connect-chevron${open ? " open" : ""}`}>▼</span>
+      </button>
+
+      {open && (
+        <div className="how-connect-body">
+          <div className="text-xs text3" style={{ marginBottom: 14 }}>
+            Как долго хранить историю сообщений и присылать уведомления об
+            удалённых и изменённых
+          </div>
+          <HistoryRetentionControl
+            currentHours={hours}
+            onSaved={onSaved}
+            showToast={showToast}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NoSubBlock() {
   const navigate = useNavigate();
   return (
@@ -212,7 +248,7 @@ function NoSubBlock() {
 // ── Main ──────────────────────────────────────────────────────────────────
 
 export function HomePage() {
-  const { me, refreshMe } = useApp();
+  const { me, refreshMe, showToast } = useApp();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -328,6 +364,15 @@ export function HomePage() {
 
       {/* How to connect — показываем когда мониторинг не активен */}
       {hasActive && !monitoring_active && <HowToConnect />}
+
+      {/* Срок хранения истории и уведомлений */}
+      {hasActive && (
+        <HistoryRetentionCard
+          hours={me.history_retention_hours}
+          onSaved={() => refreshMe()}
+          showToast={showToast}
+        />
+      )}
 
       {/* Stats */}
       {hasActive && (

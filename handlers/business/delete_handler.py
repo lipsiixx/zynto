@@ -13,6 +13,7 @@ from database.queries import messages as messages_q
 from handlers.business.message_handler import resolve_owner
 from services import ws_broadcaster as broadcaster
 from services.notifier import get_notifier
+from utils.formatters import is_message_too_old_to_notify
 
 logger = logging.getLogger(__name__)
 router = Router(name="business-delete")
@@ -52,4 +53,8 @@ async def on_deleted_business_messages(
             "fileUniqueId": record.file_unique_id,
             "mimeType": record.mime_type,
         }))
-        await notifier.notify_deleted(owner.telegram_id, record)
+        # mark_deleted выше отрабатывает всегда — уведомление в Telegram
+        # подавляем только для сообщений старше персональной настройки
+        # owner.history_retention_hours.
+        if not is_message_too_old_to_notify(record, owner.history_retention_hours):
+            await notifier.notify_deleted(owner.telegram_id, record)

@@ -15,6 +15,7 @@ from handlers.business.message_handler import resolve_owner
 from services import media as media_service
 from services import ws_broadcaster as broadcaster
 from services.notifier import get_notifier
+from utils.formatters import is_message_too_old_to_notify
 
 logger = logging.getLogger(__name__)
 router = Router(name="business-edit")
@@ -88,4 +89,8 @@ async def on_edited_business_message(message: Message, db: AsyncSession, bot: Bo
         "fileUniqueId": record.file_unique_id,
         "mimeType": record.mime_type,
     }))
-    await get_notifier().notify_edited(owner.telegram_id, record)
+    # Запись в БД (mark_edited/save_message выше) фиксируется всегда — уведомление
+    # в Telegram подавляем только для сообщений старше персональной настройки
+    # owner.history_retention_hours.
+    if not is_message_too_old_to_notify(record, owner.history_retention_hours):
+        await get_notifier().notify_edited(owner.telegram_id, record)

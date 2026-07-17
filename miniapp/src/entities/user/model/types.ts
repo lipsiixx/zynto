@@ -20,5 +20,6 @@ export interface Me {
   subscription: Subscription
   monitoring_active: boolean
   summary: Summary
+  history_retention_hours: number
   flags?: string[]
 }

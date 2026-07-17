@@ -62,7 +62,10 @@ export function AdminApp({ token, fullAccess }: Props) {
               <Route path="/a/chat/:userId/:chatId" element={<ChatMessagesPage />} />
               <Route path="/a/stats" element={<StatsPage />} />
               <Route path="/a/stats/user/:tid" element={<UserStatsPage />} />
-              <Route path="/a/graph" element={<GraphPage />} />
+              <Route
+                path="/a/graph"
+                element={fullAccess ? <GraphPage /> : <Navigate to="/a/dashboard" replace />}
+              />
               <Route path="/a/promo" element={<PromoPage />} />
               <Route path="/a/tariffs" element={<TariffsPage />} />
               <Route path="/a/manage-users" element={<ManageUsersPage />} />

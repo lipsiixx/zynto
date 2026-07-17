@@ -29,7 +29,7 @@ from middlewares.channel_sub import ChannelSubscriptionMiddleware
 from middlewares.database import DatabaseMiddleware
 from middlewares.throttle import ThrottleMiddleware
 from services import channel_sub
-from services import cleaner, media
+from services import cleaner, disk_monitor, media
 from services import notifier as notifier_module
 from services import proxy_monitor as proxy_monitor_module
 from services.notifier import Notifier
@@ -113,6 +113,8 @@ def setup_middlewares(dp: Dispatcher, user_router, admin_router, redis: Redis | 
 def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="UTC")
     scheduler.add_job(cleaner.run_cleanup, "interval", hours=24, id="cleanup")
+    scheduler.add_job(disk_monitor.check_disk_usage, "interval",
+                      minutes=10, id="disk_monitor")
     scheduler.add_job(check_expired_subscriptions, "interval",
                       minutes=5, id="check_expired")
     scheduler.add_job(run_nudge_job, "interval", minutes=10,

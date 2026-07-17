@@ -37,9 +37,11 @@ export function AdminNav({ isSuperadmin, fullAccess }: Props) {
       <NavLink to="/a/stats" className={({ isActive }) => `admin-nav-item${isActive ? ' active' : ''}`}>
         Статистика
       </NavLink>
-      <NavLink to="/a/graph" className={({ isActive }) => `admin-nav-item${isActive ? ' active' : ''}`}>
-        Граф
-      </NavLink>
+      {fullAccess && (
+        <NavLink to="/a/graph" className={({ isActive }) => `admin-nav-item${isActive ? ' active' : ''}`}>
+          Граф
+        </NavLink>
+      )}
       <NavLink to="/a/settings" className={({ isActive }) => `admin-nav-item${isActive ? ' active' : ''}`}>
         Настройки
       </NavLink>

@@ -71,6 +71,15 @@ async def set_blocked(db: AsyncSession, telegram_id: int, blocked: bool) -> None
     await db.commit()
 
 
+async def set_history_retention_hours(db: AsyncSession, telegram_id: int, hours: int) -> None:
+    """Персональная настройка окна видимости истории/уведомлений (см.
+    utils/formatters.is_valid_retention_hours для допустимых значений)."""
+    await db.execute(
+        update(User).where(User.telegram_id == telegram_id).values(history_retention_hours=hours)
+    )
+    await db.commit()
+
+
 async def update_subscription_fields(
     db: AsyncSession,
     telegram_id: int,

@@ -9,6 +9,28 @@ MAX_TEXT_LEN = 1000
 # Московское время UTC+3 — используем для всех отображаемых дат/времени
 MSK = timezone(timedelta(hours=3))
 
+# Дефолтное значение персональной настройки User.history_retention_hours (48ч =
+# 2 дня) — используется как server_default в модели/миграции. Сама настройка
+# управляет ОДНОВРЕМЕННО двумя вещами: окном видимости истории в мини-аппе
+# (GET /webapp/contacts/{chat_id}/events, см. database/queries/webapp.py::
+# get_contact_events) и порогом подавления Telegram-уведомлений об edit/delete
+# (is_message_too_old_to_notify ниже). Не относится к retention в БД
+# (services/cleaner.py, services/disk_monitor.py, /del) — то, что физически
+# хранится, настраивается независимо через bot_settings.
+DEFAULT_HISTORY_RETENTION_HOURS = 48
+
+# Допустимые значения History Retention: 1-12 часов ИЛИ кратно 24 от 24 (1 день)
+# до 168 (неделя). Единственный источник правды для валидации в API — сверяйся
+# с этой функцией при описании контракта для фронтенда.
+_VALID_RETENTION_DAY_HOURS = (24, 48, 72, 96, 120, 144, 168)
+
+
+def is_valid_retention_hours(hours: int) -> bool:
+    """1-12 часов ИЛИ кратно 24 от 24 (1 день) до 168 (неделя)."""
+    if 1 <= hours <= 12:
+        return True
+    return hours in _VALID_RETENTION_DAY_HOURS
+
 MESSAGE_TYPE_LABELS = {
     "text": "текст",
     "photo": "📷 фото",
@@ -96,6 +118,21 @@ def days_left(dt: datetime | None) -> str:
     if 2 <= days <= 4:
         return f"осталось {days} дня"
     return f"осталось {days} дней"
+
+
+def is_message_too_old_to_notify(record, retention_hours: int) -> bool:
+    """True, если сообщение получено раньше retention_hours назад — уведомлять о его
+    правке/удалении не нужно (сама запись в БД при этом обновляется как обычно).
+
+    retention_hours — персональная настройка владельца (User.history_retention_hours),
+    та же величина, что ограничивает видимость истории в мини-аппе.
+    """
+    received_at = getattr(record, "received_at", None)
+    if received_at is None:
+        return False
+    if received_at.tzinfo is None:
+        received_at = received_at.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - received_at > timedelta(hours=retention_hours)
 
 
 def duration_text(duration_days: int | None) -> str:

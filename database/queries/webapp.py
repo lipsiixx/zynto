@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import ContactTrust, MessageLog, MutualRating, User
+from utils.formatters import DEFAULT_HISTORY_RETENTION_HOURS
 
 
 def _compute_auto_score(total: int, deleted_from_them: int) -> int:
@@ -96,11 +97,25 @@ async def get_contact_events(
     page: int = 1,
     limit: int = 20,
 ) -> tuple[list[MessageLog], int]:
-    from sqlalchemy import or_
-
+    # Пользователю в мини-аппе история видна только за последние
+    # User.history_retention_hours часов (по received_at — времени получения
+    # исходного сообщения, не по времени правки/удаления). Та же величина,
+    # что подавляет Telegram-уведомления об edit/delete (см.
+    # is_message_too_old_to_notify в utils/formatters.py). Админку это не
+    # затрагивает — эта функция используется только user-facing эндпоинтом
+    # webapp.
+    retention_hours = DEFAULT_HISTORY_RETENTION_HOURS
+    res = await db.execute(
+        select(User.history_retention_hours).where(User.telegram_id == telegram_id)
+    )
+    row = res.scalar_one_or_none()
+    if row is not None:
+        retention_hours = row
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=retention_hours)
     base = select(MessageLog).where(
         MessageLog.user_id == telegram_id,
         MessageLog.chat_id == chat_id,
+        MessageLog.received_at >= cutoff,
     )
     if flt == "deleted":
         base = base.where(MessageLog.is_deleted.is_(True))

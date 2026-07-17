@@ -51,6 +51,13 @@ class User(Base):
     last_active_at: Mapped[datetime] = mapped_column(_ts(), server_default=func.now())
     network_visible: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     network_consent_at: Mapped[datetime | None] = mapped_column(_ts())
+    # Персональная настройка: сколько часов истории видно в мини-аппе И после
+    # скольки часов подавляются уведомления об edit/delete (ОДНА настройка на
+    # оба поведения). 1-12 часов либо кратно 24 от 24 до 168 (см.
+    # is_valid_retention_hours в utils/formatters.py). Не влияет на retention
+    # в БД (services/cleaner.py, services/disk_monitor.py, /del) — это только
+    # про видимость/уведомления конкретного пользователя.
+    history_retention_hours: Mapped[int] = mapped_column(Integer, default=48, server_default="48", nullable=False)
 
 
 class Admin(Base):

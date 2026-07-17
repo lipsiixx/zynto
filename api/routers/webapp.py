@@ -30,6 +30,7 @@ from database.queries import tariffs as tariffs_q
 from database.queries import users as users_q
 from database.queries import webapp as webapp_q
 from services import subscription as sub_service
+from utils.formatters import is_valid_retention_hours
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,10 @@ class WebAppAuthResponse(BaseModel):
 
 class TrustSetRequest(BaseModel):
     score: Optional[int] = None  # None = reset to auto
+
+
+class HistoryRetentionSetRequest(BaseModel):
+    hours: int
 
 
 class ActivateRequest(BaseModel):
@@ -148,6 +153,7 @@ async def webapp_me(
         },
         "monitoring_active": conn is not None,
         "summary": summary,
+        "history_retention_hours": user.history_retention_hours,
     }
 
     flags: list[str] = []
@@ -242,6 +248,21 @@ async def webapp_set_trust(
         raise HTTPException(status_code=422, detail="score_out_of_range")
     await webapp_q.set_trust_score(db, telegram_id, chat_id, body.score)
     return {"chat_id": chat_id, "manual_score": body.score}
+
+
+@router.put("/settings/history-retention")
+async def webapp_set_history_retention(
+    body: HistoryRetentionSetRequest,
+    telegram_id: int = Depends(_require_webapp_auth),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Персональная настройка: окно видимости истории в мини-аппе И порог
+    подавления уведомлений об edit/delete — управляются ОДНИМ значением
+    (см. User.history_retention_hours, is_valid_retention_hours)."""
+    if not is_valid_retention_hours(body.hours):
+        raise HTTPException(status_code=422, detail="invalid_hours")
+    await users_q.set_history_retention_hours(db, telegram_id, body.hours)
+    return {"history_retention_hours": body.hours}
 
 
 @router.get("/tariffs")
