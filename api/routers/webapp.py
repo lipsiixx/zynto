@@ -265,6 +265,19 @@ async def webapp_set_history_retention(
     return {"history_retention_hours": body.hours}
 
 
+@router.post("/settings/history-clear")
+async def webapp_clear_history(
+    telegram_id: int = Depends(_require_webapp_auth),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """«Очистить всю историю»: НЕ удаляет строки messages_log — только
+    двигает персональный cutoff (User.history_cleared_at), после которого
+    записи скрываются из ленты edit/delete/media в get_contact_events.
+    Home (контакты/статистика/доверие) не затрагивается."""
+    cleared_at = await users_q.clear_history(db, telegram_id)
+    return {"history_cleared_at": cleared_at.isoformat()}
+
+
 @router.get("/tariffs")
 async def webapp_tariffs(
     db: AsyncSession = Depends(get_db),

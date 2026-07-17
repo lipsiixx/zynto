@@ -80,6 +80,19 @@ async def set_history_retention_hours(db: AsyncSession, telegram_id: int, hours:
     await db.commit()
 
 
+async def clear_history(db: AsyncSession, telegram_id: int) -> datetime:
+    """«Очистить всю историю» в мини-аппе: НЕ удаляет строки messages_log —
+    только персональный cutoff, применяется в get_contact_events (см.
+    database/queries/webapp.py). Админка/graf/stats/cleaner.py продолжают
+    видеть полную историю."""
+    now = datetime.now(timezone.utc)
+    await db.execute(
+        update(User).where(User.telegram_id == telegram_id).values(history_cleared_at=now)
+    )
+    await db.commit()
+    return now
+
+
 async def update_subscription_fields(
     db: AsyncSession,
     telegram_id: int,

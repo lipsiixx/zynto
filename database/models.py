@@ -58,6 +58,11 @@ class User(Base):
     # в БД (services/cleaner.py, services/disk_monitor.py, /del) — это только
     # про видимость/уведомления конкретного пользователя.
     history_retention_hours: Mapped[int] = mapped_column(Integer, default=48, server_default="48", nullable=False)
+    # Момент, когда пользователь нажал «очистить всю историю» в мини-аппе.
+    # NULL = никогда не очищал. НЕ удаляет строки messages_log (те остаются
+    # видны админке/graf/stats/cleaner.py) — это только персональный cutoff
+    # для ленты событий в get_contact_events (см. database/queries/webapp.py).
+    history_cleared_at: Mapped[datetime | None] = mapped_column(_ts())
 
 
 class Admin(Base):

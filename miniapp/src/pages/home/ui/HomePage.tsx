@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useApp } from "@/app/AppContext";
 import { getInstructionPhotoUrl } from "@/entities/message";
 import { HistoryRetentionControl } from "@/features/history-retention";
+import { ClearHistoryButton } from "@/features/clear-history";
 import { useCountUp } from "@/shared/lib/useCountUp";
 import { Skeleton } from "@/shared/ui";
 
@@ -191,10 +192,12 @@ function HowToConnect() {
 function HistoryRetentionCard({
   hours,
   onSaved,
+  onCleared,
   showToast,
 }: {
   hours: number;
   onSaved: (hours: number) => void;
+  onCleared: () => void;
   showToast: (msg: string, type?: "success" | "error" | "info") => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -217,6 +220,16 @@ function HistoryRetentionCard({
             onSaved={onSaved}
             showToast={showToast}
           />
+
+          <div
+            style={{
+              marginTop: 18,
+              paddingTop: 16,
+              borderTop: "1px solid var(--purple-border)",
+            }}
+          >
+            <ClearHistoryButton onCleared={onCleared} showToast={showToast} />
+          </div>
         </div>
       )}
     </div>
@@ -370,6 +383,7 @@ export function HomePage() {
         <HistoryRetentionCard
           hours={me.history_retention_hours}
           onSaved={() => refreshMe()}
+          onCleared={() => refreshMe()}
           showToast={showToast}
         />
       )}

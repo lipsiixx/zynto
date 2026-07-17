@@ -106,12 +106,24 @@ async def get_contact_events(
     # webapp.
     retention_hours = DEFAULT_HISTORY_RETENTION_HOURS
     res = await db.execute(
-        select(User.history_retention_hours).where(User.telegram_id == telegram_id)
+        select(User.history_retention_hours, User.history_cleared_at).where(
+            User.telegram_id == telegram_id
+        )
     )
-    row = res.scalar_one_or_none()
+    row = res.one_or_none()
     if row is not None:
-        retention_hours = row
+        retention_hours = row.history_retention_hours
     cutoff = datetime.now(timezone.utc) - timedelta(hours=retention_hours)
+    # «Очистить всю историю» (User.history_cleared_at) двигает cutoff вперёд
+    # относительно обычного retention-окна, если пользователь чистил историю
+    # позже, чем наступило бы окно retention само по себе. Не влияет на
+    # get_user_contacts/get_user_summary/get_contact_stats — там намеренно
+    # остаётся полная агрегированная история.
+    if row is not None and row.history_cleared_at is not None:
+        cleared_at = row.history_cleared_at
+        if cleared_at.tzinfo is None:
+            cleared_at = cleared_at.replace(tzinfo=timezone.utc)
+        cutoff = max(cutoff, cleared_at)
     base = select(MessageLog).where(
         MessageLog.user_id == telegram_id,
         MessageLog.chat_id == chat_id,
