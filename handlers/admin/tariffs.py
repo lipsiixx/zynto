@@ -189,8 +189,17 @@ FIELD_PROMPTS = {
 
 
 @router.callback_query(F.data.startswith("a:tfield:"))
-async def cb_field(call: CallbackQuery, state: FSMContext) -> None:
+async def cb_field(call: CallbackQuery, db: AsyncSession, state: FSMContext) -> None:
     _, _, tariff_id, field = call.data.split(":")
+    if field == "price_stars":
+        tariff = await tariffs_q.get_tariff(db, int(tariff_id))
+        if tariff is not None and tariffs_q.price_locked_by_sale(tariff):
+            await call.answer(
+                "Цена сейчас — акционная. Меняй её через акцию в мини-аппе "
+                "(«Акция» → скорректировать или завершить), не напрямую.",
+                show_alert=True,
+            )
+            return
     await state.set_state(EditTariffStates.waiting_value)
     await state.update_data(tariff_id=int(tariff_id), field=field)
     await call.message.answer(FIELD_PROMPTS[field])
@@ -229,6 +238,14 @@ async def st_value(message: Message, db: AsyncSession, state: FSMContext) -> Non
     tariff = await tariffs_q.get_tariff(db, tariff_id)
     if tariff is None:
         await message.answer("Тариф не найден.")
+        return
+    if field == "price_stars" and tariffs_q.price_locked_by_sale(tariff):
+        # На случай гонки: акцию запустили, пока админ вводил значение.
+        await message.answer(
+            "Цена сейчас — акционная, изменение отклонено. Меняй её через "
+            "акцию в мини-аппе, не напрямую."
+        )
+        await message.answer(_tariff_card(tariff), reply_markup=tariff_actions_kb(tariff))
         return
     setattr(tariff, field, value)
     await db.commit()

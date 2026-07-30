@@ -60,6 +60,14 @@ async def update_tariff(db: AsyncSession, tariff_id: int, **fields) -> Tariff | 
     return tariff
 
 
+def price_locked_by_sale(tariff: Tariff) -> bool:
+    """True, если у тарифа активна акция (`original_price_stars` заполнен) —
+    в этом случае `price_stars` является акционной ценой и не должен меняться
+    напрямую через обычный PATCH/редактирование, только через `start_sale`
+    (скорректировать акцию) или `end_sale` (сначала снять акцию)."""
+    return tariff.original_price_stars is not None
+
+
 async def update_tariff_fields(db: AsyncSession, tariff_id: int, fields: dict) -> Tariff | None:
     """Частичное обновление, в отличие от `update_tariff` не пропускает явный None.
 
@@ -67,10 +75,24 @@ async def update_tariff_fields(db: AsyncSession, tariff_id: int, fields: dict) -
     PATCH-эндпоинт мини-аппа — `update_tariff(**fields)` игнорирует None-значения.
     Вызывающий код должен передавать только реально присланные клиентом поля
     (например `body.model_dump(exclude_unset=True)`).
+
+    Returns:
+        None — тариф не найден (сохраняем прежний контракт для вызывающего
+        кода, которое отвечает на это 404).
+
+    Raises:
+        ValueError("price_locked_by_sale") — попытка напрямую изменить
+            `price_stars` при активной акции (см. `price_locked_by_sale()`).
+            Это единственное поле, для которого во время акции обязателен
+            путь через `start_sale`/`end_sale` — иначе `discount_percent()`
+            считается от «неправильной» базы и может уйти в 0/отрицательное
+            значение.
     """
     tariff = await get_tariff(db, tariff_id)
     if tariff is None:
         return None
+    if "price_stars" in fields and price_locked_by_sale(tariff):
+        raise ValueError("price_locked_by_sale")
     for key, value in fields.items():
         if hasattr(tariff, key):
             setattr(tariff, key, value)
@@ -98,10 +120,17 @@ async def count_subscriptions_for_tariff(db: AsyncSession, tariff_id: int) -> in
 
 def discount_percent(tariff: Tariff) -> int | None:
     """Процент скидки для отдачи в API/чате — считается на лету, не хранится в БД.
-    None, если акции нет (original_price_stars пуст)."""
+    None, если акции нет (original_price_stars пуст).
+
+    Defense-in-depth: при корректной работе `start_sale`/`end_sale` и защите в
+    `update_tariff_fields` результат всегда > 0, но если данные в БД всё же
+    оказались в противоречивом состоянии (price_stars >= original_price_stars),
+    отдаём None вместо 0/отрицательного числа — чтобы клиенты (бот, мини-апп)
+    показывали тариф как обычный, без сломанного бейджа акции."""
     if not tariff.original_price_stars:
         return None
-    return round((1 - tariff.price_stars / tariff.original_price_stars) * 100)
+    percent = round((1 - tariff.price_stars / tariff.original_price_stars) * 100)
+    return percent if percent > 0 else None
 
 
 async def start_sale(db: AsyncSession, tariff_id: int, new_price_stars: int) -> Tariff:

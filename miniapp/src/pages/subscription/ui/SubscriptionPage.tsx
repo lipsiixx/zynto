@@ -161,7 +161,10 @@ export function SubscriptionPage() {
           </div>
         ) : (
           tariffs.map((t) => {
-            const onSale = t.discount_percent != null;
+            // Доп. защита на фронте (defense-in-depth): бэкенд гарантирует
+            // discount_percent > 0 или null, но подстраховываемся на случай
+            // рассинхронизации кэша/старого ответа API.
+            const onSale = t.discount_percent != null && t.discount_percent > 0;
             return (
               <div
                 key={t.id}

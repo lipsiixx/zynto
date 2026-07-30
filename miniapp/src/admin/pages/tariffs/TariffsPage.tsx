@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import type { TariffOut, TariffPayload } from '@/admin/entities/tariff'
+import type { TariffOut, TariffPatchPayload, TariffPayload } from '@/admin/entities/tariff'
 import {
   createTariff,
   deleteTariff,
@@ -84,7 +84,9 @@ export function TariffsPage() {
           submitLabel="Создать тариф"
           initial={EMPTY_FORM}
           onSubmit={payload =>
-            createTariff(payload).then(created => {
+            // Форма создания никогда не блокирует цену (priceLocked не передан),
+            // так что payload всегда содержит все обязательные поля TariffPayload.
+            createTariff(payload as TariffPayload).then(created => {
               setItems(prev => [...prev, created])
               setShowCreate(false)
               showToast('Тариф создан', 'success')
@@ -112,6 +114,7 @@ export function TariffsPage() {
                 key={t.id}
                 submitLabel="Сохранить"
                 initial={t}
+                priceLocked={t.original_price_stars != null}
                 onSubmit={payload =>
                   updateTariff(t.id, payload).then(updated => {
                     setItems(prev => prev.map(x => (x.id === t.id ? updated : x)))
@@ -178,12 +181,17 @@ export function TariffsPage() {
 function TariffForm({
   initial,
   submitLabel,
+  priceLocked,
   onSubmit,
   onCancel,
 }: {
   initial: TariffPayload
   submitLabel: string
-  onSubmit: (payload: TariffPayload) => Promise<unknown>
+  /** true, если на тарифе активна акция — цена меняется только через кнопки
+   * "Акция"/"Снять акцию" (см. price_locked_by_sale на бэкенде), поле в
+   * обычной форме редактирования блокируется. */
+  priceLocked?: boolean
+  onSubmit: (payload: TariffPatchPayload) => Promise<unknown>
   onCancel?: () => void
 }) {
   const [name, setName] = useState(initial.name)
@@ -202,23 +210,34 @@ function TariffForm({
       setError('Укажи название тарифа')
       return
     }
-    const price = Number(priceStars)
-    if (!price || price < 1 || price > MAX_PRICE_STARS) {
-      setError(`Цена — от 1 до ${MAX_PRICE_STARS}⭐ (лимит Telegram на инвойс в Stars)`)
-      return
+    let price: number | undefined
+    if (!priceLocked) {
+      price = Number(priceStars)
+      if (!price || price < 1 || price > MAX_PRICE_STARS) {
+        setError(`Цена — от 1 до ${MAX_PRICE_STARS}⭐ (лимит Telegram на инвойс в Stars)`)
+        return
+      }
     }
-    const payload: TariffPayload = {
+    const payload: TariffPatchPayload = {
       name: name.trim(),
       description: description.trim() || null,
       duration_days: lifetime ? null : Math.max(1, Number(durationDays) || 1),
-      price_stars: price,
       sort_order: Number(sortOrder) || 0,
+      // Пока акция активна, поле не отправляем вовсе — бэкенд возвращает 422
+      // price_locked_by_sale на любую попытку затронуть price_stars (даже тем
+      // же значением), пока в теле PATCH присутствует этот ключ.
+      ...(priceLocked ? {} : { price_stars: price as number }),
     }
     setSubmitting(true)
     try {
       await onSubmit(payload)
     } catch (e) {
-      setError((e as Error).message)
+      const msg = (e as Error).message
+      setError(
+        msg === 'price_locked_by_sale'
+          ? 'Нельзя менять цену напрямую во время акции. Сначала снимите акцию.'
+          : msg,
+      )
     } finally {
       setSubmitting(false)
     }
@@ -254,7 +273,22 @@ function TariffForm({
       <div className="admin-grid-2">
         <div className="admin-form-row">
           <label className="text-sm text2">Цена, ⭐ (1–{MAX_PRICE_STARS})</label>
-          <input className="input" type="number" min={1} max={MAX_PRICE_STARS} value={priceStars} onChange={e => setPriceStars(e.target.value)} />
+          <input
+            className="input"
+            type="number"
+            min={1}
+            max={MAX_PRICE_STARS}
+            value={priceStars}
+            disabled={priceLocked}
+            style={priceLocked ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+            title={priceLocked ? 'Цена управляется акцией' : undefined}
+            onChange={e => setPriceStars(e.target.value)}
+          />
+          {priceLocked && (
+            <div className="text-xs text2" style={{ marginTop: 4 }}>
+              Цена управляется акцией — сначала снимите акцию, чтобы менять базовую цену
+            </div>
+          )}
         </div>
         <div className="admin-form-row">
           <label className="text-sm text2">Порядок сортировки</label>

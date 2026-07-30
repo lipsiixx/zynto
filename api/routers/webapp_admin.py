@@ -368,7 +368,13 @@ async def admin_tariffs_update(
 ) -> dict:
     fields = body.model_dump(exclude_unset=True)
     _validate_tariff_fields(fields)
-    t = await tariffs_q.update_tariff_fields(db, tariff_id, fields)
+    try:
+        t = await tariffs_q.update_tariff_fields(db, tariff_id, fields)
+    except ValueError as exc:
+        # price_locked_by_sale — акция активна, price_stars меняется только
+        # через POST /tariffs/{id}/sale (скорректировать) или .../sale/end
+        # (сначала снять акцию).
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     if t is None:
         raise HTTPException(status_code=404, detail="tariff_not_found")
     return _tariff_out(t)
