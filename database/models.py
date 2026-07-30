@@ -86,6 +86,10 @@ class Tariff(Base):
     description: Mapped[str | None] = mapped_column(Text)
     duration_days: Mapped[int | None] = mapped_column(Integer)  # NULL = lifetime
     price_stars: Mapped[int] = mapped_column(Integer, nullable=False)
+    # NULL = нет акции. Задано и > price_stars → акция активна: хранит
+    # «старую» цену на время скидки. Меняется только через start_sale/end_sale
+    # в database/queries/tariffs.py, не через обычный update_tariff_fields.
+    original_price_stars: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     created_by: Mapped[int | None] = mapped_column(BigInteger)

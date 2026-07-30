@@ -736,6 +736,7 @@ input[type=range]::-moz-range-thumb {
 .badge-red { background: var(--red-dim); color: var(--red); }
 .badge-purple { background: rgba(124,58,237,0.15); color: var(--purple-l); }
 .badge-gray { background: rgba(255,255,255,0.06); color: var(--text2); }
+.badge-yellow { background: rgba(214,158,46,0.15); color: var(--yellow); }
 
 .spinner {
   width: 32px; height: 32px;
@@ -808,6 +809,80 @@ input[type=range]::-moz-range-thumb {
 
 .tariff-btn {
   margin-top: 12px;
+}
+
+/* ── Sale (акция на тариф) ───────────────────────────────────────────────── */
+.sale-card {
+  position: relative;
+  overflow: visible;
+  border-color: rgba(214, 158, 46, 0.55);
+  box-shadow: var(--shadow-1), 0 0 22px rgba(214, 158, 46, 0.22);
+}
+
+.sale-badge {
+  position: absolute;
+  top: -10px;
+  right: 14px;
+  background: linear-gradient(135deg, #d69e2e, #f2c464);
+  color: #241a02;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  box-shadow: 0 2px 10px rgba(214, 158, 46, 0.5);
+  z-index: 2;
+  white-space: nowrap;
+}
+
+.sale-price-old {
+  font-size: 12px;
+  color: var(--text3);
+  text-decoration: line-through;
+}
+
+.sale-price-new {
+  font-size: 20px;
+  color: var(--yellow);
+}
+
+/* Разлетающиеся звёзды вокруг карточки с акцией — чисто CSS, без зависимостей.
+   Каждая звезда крутится по своей траектории (--tx/--ty) с индивидуальной
+   задержкой, поэтому на всей карточке всегда видно 1-2 еле заметные искры,
+   а не постоянный аляповатый рой и не единственная разовая вспышка. */
+.sale-stars {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.sale-star {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 13px;
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: sale-star-burst 4.2s ease-out infinite;
+}
+
+@keyframes sale-star-burst {
+  0% {
+    transform: translate(-50%, -50%) translate(0, 0) scale(0.3) rotate(0deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  65% {
+    opacity: 0.45;
+  }
+  100% {
+    transform: translate(-50%, -50%) translate(var(--tx), var(--ty)) scale(1) rotate(200deg);
+    opacity: 0;
+  }
 }
 
 /* ── Subscription status ─────────────────────────────────────────────────── */
@@ -939,9 +1014,10 @@ input[type=range]::-moz-range-thumb {
 /* Спиннер оставлен: индикация загрузки важнее, чем отсутствие движения. */
 @media (prefers-reduced-motion: reduce) {
   .pv-enter-fwd, .pv-enter-back, .anim-rise, .skeleton,
-  .sheet, .sheet-backdrop, .toast, .toast-leaving, .countdown-urgent {
+  .sheet, .sheet-backdrop, .toast, .toast-leaving, .countdown-urgent, .sale-star {
     animation: none !important;
   }
+  .sale-star { display: none; }
   .how-connect-chevron, .nav-item svg, .nav-item .nav-dot, .sub-bar-fill, .sub-bar-emoji {
     transition: none !important;
   }

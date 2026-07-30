@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { TariffOut, TariffPayload } from '@/admin/entities/tariff'
-import { createTariff, deleteTariff, listTariffs, toggleTariff, updateTariff } from '@/admin/entities/tariff'
+import {
+  createTariff,
+  deleteTariff,
+  endTariffSale,
+  listTariffs,
+  startTariffSale,
+  toggleTariff,
+  updateTariff,
+} from '@/admin/entities/tariff'
 import { useAdminCtx } from '@/admin/shared/lib/AdminCtx'
 import { ConfirmButton } from '@/admin/shared/ui'
 
@@ -16,6 +24,7 @@ export function TariffsPage() {
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [saleEditId, setSaleEditId] = useState<number | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -41,6 +50,22 @@ export function TariffsPage() {
       .then(() => {
         setItems(prev => prev.filter(t => t.id !== id))
         showToast('Тариф удалён', 'success')
+      })
+      .catch(e => showToast((e as Error).message, 'error'))
+  }
+
+  const handleStartSale = (id: number, newPriceStars: number) =>
+    startTariffSale(id, newPriceStars).then(updated => {
+      setItems(prev => prev.map(t => (t.id === id ? updated : t)))
+      setSaleEditId(null)
+      showToast('Акция включена', 'success')
+    })
+
+  const handleEndSale = (id: number) => {
+    endTariffSale(id)
+      .then(updated => {
+        setItems(prev => prev.map(t => (t.id === id ? updated : t)))
+        showToast('Акция снята', 'success')
       })
       .catch(e => showToast((e as Error).message, 'error'))
   }
@@ -109,16 +134,38 @@ export function TariffsPage() {
                 </div>
                 <div className="row gap-8 text-xs text2" style={{ flexWrap: 'wrap', margin: '10px 0' }}>
                   <span>Срок: {t.duration_days === null ? 'навсегда' : `${t.duration_days} дн.`}</span>
-                  <span>Цена: {t.price_stars}⭐</span>
+                  {t.discount_percent != null ? (
+                    <span>
+                      Цена: <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{t.original_price_stars}⭐</span>{' '}
+                      <span className="semibold" style={{ color: 'var(--yellow)' }}>{t.price_stars}⭐</span>{' '}
+                      <span className="badge badge-yellow">−{t.discount_percent}%</span>
+                    </span>
+                  ) : (
+                    <span>Цена: {t.price_stars}⭐</span>
+                  )}
                   <span>Порядок: {t.sort_order}</span>
                 </div>
-                <div className="row gap-8" style={{ flexWrap: 'wrap' }}>
-                  <button className="admin-icon-btn" onClick={() => setEditingId(t.id)}>Редактировать</button>
-                  <button className="admin-icon-btn" onClick={() => handleToggle(t.id)}>
-                    {t.is_active ? 'Скрыть' : 'Показать'}
-                  </button>
-                  <ConfirmButton label="Удалить" onConfirm={() => handleDelete(t.id)} />
-                </div>
+
+                {saleEditId === t.id ? (
+                  <SaleForm
+                    tariff={t}
+                    onSubmit={price => handleStartSale(t.id, price)}
+                    onCancel={() => setSaleEditId(null)}
+                  />
+                ) : (
+                  <div className="row gap-8" style={{ flexWrap: 'wrap' }}>
+                    <button className="admin-icon-btn" onClick={() => setEditingId(t.id)}>Редактировать</button>
+                    <button className="admin-icon-btn" onClick={() => handleToggle(t.id)}>
+                      {t.is_active ? 'Скрыть' : 'Показать'}
+                    </button>
+                    {t.discount_percent != null ? (
+                      <ConfirmButton label="Снять акцию" onConfirm={() => handleEndSale(t.id)} />
+                    ) : (
+                      <button className="admin-icon-btn" onClick={() => setSaleEditId(t.id)}>Акция</button>
+                    )}
+                    <ConfirmButton label="Удалить" onConfirm={() => handleDelete(t.id)} />
+                  </div>
+                )}
               </div>
             ),
           )}
@@ -226,6 +273,66 @@ function TariffForm({
             Отмена
           </button>
         )}
+      </div>
+    </form>
+  )
+}
+
+function SaleForm({
+  tariff,
+  onSubmit,
+  onCancel,
+}: {
+  tariff: TariffOut
+  onSubmit: (newPriceStars: number) => Promise<unknown>
+  onCancel: () => void
+}) {
+  const [newPrice, setNewPrice] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    setError('')
+    const price = Number(newPrice)
+    if (!price || price < 1 || price >= tariff.price_stars) {
+      setError(`Акционная цена должна быть ниже текущей (${tariff.price_stars}⭐)`)
+      return
+    }
+    setSubmitting(true)
+    try {
+      await onSubmit(price)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form className="admin-form" onSubmit={handleSubmit} style={{ margin: '4px 0 10px' }}>
+      <div className="admin-form-row">
+        <label className="text-sm text2">Акционная цена, ⭐ (ниже {tariff.price_stars})</label>
+        <input
+          className="input"
+          type="number"
+          min={1}
+          max={tariff.price_stars - 1}
+          autoFocus
+          value={newPrice}
+          onChange={e => setNewPrice(e.target.value)}
+        />
+      </div>
+
+      {error && <div className="admin-error-msg">{error}</div>}
+
+      <div className="row gap-8">
+        <button className="btn btn-primary" type="submit" disabled={submitting} style={{ width: 'auto' }}>
+          {submitting ? 'Сохранение…' : 'Включить акцию'}
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={onCancel} style={{ width: 'auto' }}>
+          Отмена
+        </button>
       </div>
     </form>
   )

@@ -30,7 +30,7 @@ from keyboards.user_kb import (
     tariffs_kb,
 )
 from services import subscription as sub_service
-from utils.formatters import days_left, subscription_status_text
+from utils.formatters import days_left, esc, subscription_status_text
 
 logger = logging.getLogger(__name__)
 router = Router(name="user-subscription")
@@ -56,8 +56,14 @@ async def _show_subscription(target: Message, user: User, db: AsyncSession, edit
             # Показываем описания тарифов в тексте
             lines = ["💳 <b>Выбери тариф:</b>\n"]
             for t in tariffs:
-                desc = t.description or ""
-                lines.append(f"<b>{t.name}</b> — {t.price_stars}⭐\n{desc}")
+                name = esc(t.name)
+                desc = esc(t.description) if t.description else ""
+                discount = tariffs_q.discount_percent(t)
+                if discount is not None:
+                    price_line = f"<s>{t.original_price_stars}⭐</s> → <b>{t.price_stars}⭐</b> (−{discount}%) 🔥"
+                else:
+                    price_line = f"{t.price_stars}⭐"
+                lines.append(f"<b>{name}</b> — {price_line}\n{desc}")
             # Индикатор скидки
             if user.pending_promo_id:
                 promo = await promo_q.get_by_id(db, user.pending_promo_id)

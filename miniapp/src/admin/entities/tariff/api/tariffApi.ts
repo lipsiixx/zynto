@@ -21,3 +21,13 @@ export function toggleTariff(id: number): Promise<TariffOut> {
 export function deleteTariff(id: number): Promise<{ ok: true }> {
   return req('DELETE', `/tariffs/${id}`)
 }
+
+/** 404 — тариф не найден, 422 — цена невалидна или не ниже текущей. */
+export function startTariffSale(id: number, newPriceStars: number): Promise<TariffOut> {
+  return req('POST', `/tariffs/${id}/sale`, { new_price_stars: newPriceStars })
+}
+
+/** 404 — тариф не найден, 409 — на тарифе нет активной акции. */
+export function endTariffSale(id: number): Promise<TariffOut> {
+  return req('POST', `/tariffs/${id}/sale/end`)
+}

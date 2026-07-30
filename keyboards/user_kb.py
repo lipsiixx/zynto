@@ -63,7 +63,14 @@ def subscribe_button() -> InlineKeyboardMarkup:
 def tariffs_kb(tariffs: list[Tariff], prefix: str = "buy") -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     for t in tariffs:
-        kb.button(text=f"{t.name} — {t.price_stars} ⭐", callback_data=f"{prefix}:{t.id}")
+        # Кнопки Telegram не поддерживают HTML-разметку (в отличие от текста
+        # сообщения в _show_subscription) — акция здесь показывается plain-text.
+        if t.original_price_stars and t.original_price_stars > t.price_stars:
+            discount = round((1 - t.price_stars / t.original_price_stars) * 100)
+            text = f"🔥 {t.name} — {t.price_stars}⭐ (было {t.original_price_stars}⭐, −{discount}%)"
+        else:
+            text = f"{t.name} — {t.price_stars} ⭐"
+        kb.button(text=text, callback_data=f"{prefix}:{t.id}")
     kb.row(_miniapp_button("📱 В панель"))
     kb.adjust(1)
     _add_stars_premium(kb)

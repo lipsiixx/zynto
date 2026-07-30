@@ -292,6 +292,8 @@ async def webapp_tariffs(
                 "description": t.description,
                 "duration_days": t.duration_days,
                 "price_stars": t.price_stars,
+                "original_price_stars": t.original_price_stars,
+                "discount_percent": tariffs_q.discount_percent(t),
             }
             for t in tariffs
         ]

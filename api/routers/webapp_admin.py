@@ -296,6 +296,8 @@ def _tariff_out(t: Tariff) -> dict:
         "description": t.description,
         "duration_days": t.duration_days,
         "price_stars": t.price_stars,
+        "original_price_stars": t.original_price_stars,
+        "discount_percent": tariffs_q.discount_percent(t),
         "sort_order": t.sort_order,
         "is_active": t.is_active,
     }
@@ -369,6 +371,50 @@ async def admin_tariffs_update(
     t = await tariffs_q.update_tariff_fields(db, tariff_id, fields)
     if t is None:
         raise HTTPException(status_code=404, detail="tariff_not_found")
+    return _tariff_out(t)
+
+
+class TariffSaleBody(BaseModel):
+    new_price_stars: int
+
+
+def _sale_error_status(code: str) -> int:
+    if code == "tariff_not_found":
+        return 404
+    if code == "no_active_sale":
+        return 409
+    return 422  # invalid_price | price_not_lower
+
+
+@router.post("/tariffs/{tariff_id}/sale")
+async def admin_tariffs_start_sale(
+    tariff_id: int,
+    body: TariffSaleBody,
+    telegram_id: int = Depends(require_webapp_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    try:
+        t = await tariffs_q.start_sale(db, tariff_id, body.new_price_stars)
+    except ValueError as exc:
+        raise HTTPException(status_code=_sale_error_status(str(exc)), detail=str(exc)) from exc
+    logger.info(
+        "WebApp admin: акция на тариф id=%s new_price=%s by=%s",
+        tariff_id, body.new_price_stars, telegram_id,
+    )
+    return _tariff_out(t)
+
+
+@router.post("/tariffs/{tariff_id}/sale/end")
+async def admin_tariffs_end_sale(
+    tariff_id: int,
+    telegram_id: int = Depends(require_webapp_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    try:
+        t = await tariffs_q.end_sale(db, tariff_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=_sale_error_status(str(exc)), detail=str(exc)) from exc
+    logger.info("WebApp admin: акция завершена tariff_id=%s by=%s", tariff_id, telegram_id)
     return _tariff_out(t)
 
 
