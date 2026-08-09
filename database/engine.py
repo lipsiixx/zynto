@@ -20,8 +20,8 @@ engine: AsyncEngine = create_async_engine(
     settings.database_url,
     echo=False,
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    pool_size=20,
+    max_overflow=40,
 )
 
 SessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(

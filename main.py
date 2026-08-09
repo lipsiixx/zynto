@@ -26,6 +26,7 @@ from handlers.user import get_user_router
 from middlewares.admin_check import AdminCheckMiddleware
 from middlewares.auth import AuthMiddleware
 from middlewares.channel_sub import ChannelSubscriptionMiddleware
+from middlewares.concurrency import ConcurrencyLimitMiddleware
 from middlewares.database import DatabaseMiddleware
 from middlewares.throttle import ThrottleMiddleware
 from services import channel_sub
@@ -93,6 +94,10 @@ async def seed_data() -> None:
 
 
 def setup_middlewares(dp: Dispatcher, user_router, admin_router, redis: Redis | None) -> None:
+    # concurrency limit — до database, чтобы ограничивать конкурентность до захвата
+    # соединения с БД (защита от исчерпания пулов при всплеске апдейтов, напр. business_message)
+    dp.update.outer_middleware(ConcurrencyLimitMiddleware(limit=25))
+
     # database — внешний middleware для всех апдейтов
     dp.update.outer_middleware(DatabaseMiddleware())
 
@@ -209,10 +214,10 @@ async def main() -> None:
     storage = MemoryStorage()
     try:
         redis = Redis.from_url(
-            settings.redis_url, protocol=2, decode_responses=True)
+            settings.redis_url, protocol=2, decode_responses=True, max_connections=200)
         await redis.ping()
         storage = RedisStorage(redis=Redis.from_url(
-            settings.redis_url, protocol=2))
+            settings.redis_url, protocol=2, max_connections=200))
         logger.info("Redis подключён: %s", settings.redis_url)
     except Exception as exc:  # noqa: BLE001
         logger.warning(
