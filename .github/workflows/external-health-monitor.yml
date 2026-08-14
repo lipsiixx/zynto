@@ -1,0 +1,106 @@
+name: External health monitor
+
+# Independent external watchdog for the production server (bandana). Runs on
+# GitHub-hosted runners, NOT on bandana and NOT on the VPS relay — both of
+# those have been the single point of failure in past outages (see Obsidian
+# log entries 2026-07-13/07-14/08-13). This is deliberately the opposite: it
+# only depends on GitHub's own infrastructure and Telegram's Bot API, so it
+# keeps working even if the whole home server is dark.
+#
+# Logic: every run curls the bot's public health endpoint. State (up/down) is
+# NOT stored in a file/cache — it is derived from the conclusion of previous
+# workflow runs via `gh run list`, so there is nothing to get out of sync.
+# Alerts fire only on state transitions (2 consecutive failures -> DOWN alert,
+# 1 success after DOWN -> UP alert), mirroring the FAIL_THRESHOLD=2 design of
+# the local zynto-miniapp-watch.sh watchdog on bandana.
+#
+# Setup required (one-time, NOT done by this workflow itself):
+#   gh secret set MONITOR_BOT_TOKEN --repo lipsiixx/zynto   # value = BOT_TOKEN from bandana .env
+#   gh secret set MONITOR_CHAT_ID   --repo lipsiixx/zynto   # value = SUPERADMIN_ID from bandana .env
+# Without these two secrets the workflow runs the health check but silently
+# skips sending Telegram alerts (logs a warning in the run output instead).
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: external-health-monitor
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check https://zynto.duckdns.org/v1/health
+        id: check
+        run: |
+          set -uo pipefail
+          URL="https://zynto.duckdns.org/v1/health"
+          if curl -fsS --max-time 20 --retry 2 --retry-delay 3 "$URL" -o /dev/null; then
+            echo "ok=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=0" >> "$GITHUB_OUTPUT"
+            echo "health check failed for $URL"
+            exit 1
+          fi
+
+      - name: Evaluate state transition and alert via Telegram
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BOT_TOKEN: ${{ secrets.MONITOR_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.MONITOR_CHAT_ID }}
+          CURRENT_OK: ${{ steps.check.outputs.ok }}
+        run: |
+          set -uo pipefail
+
+          # Last 5 completed runs of this workflow on main, most recent first,
+          # excluding the run currently in progress (it has no conclusion yet
+          # while this step executes, so it's naturally excluded already).
+          mapfile -t PREV < <(gh run list \
+            --workflow "external-health-monitor.yml" \
+            --branch main \
+            --json conclusion,status \
+            --jq '[.[] | select(.status=="completed")] | .[0:5] | .[].conclusion' \
+            --limit 10 2>/dev/null || true)
+
+          prev1="${PREV[0]:-}"
+          prev2="${PREV[1]:-}"
+
+          send_telegram() {
+            local text="$1"
+            if [ -z "${BOT_TOKEN:-}" ] || [ -z "${CHAT_ID:-}" ]; then
+              echo "::warning::MONITOR_BOT_TOKEN / MONITOR_CHAT_ID secret not set — skipping Telegram alert. Run: gh secret set MONITOR_BOT_TOKEN / MONITOR_CHAT_ID"
+              return 0
+            fi
+            resp=$(curl -s --max-time 15 \
+              -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+              -d chat_id="${CHAT_ID}" \
+              --data-urlencode "text=${text}" 2>&1)
+            if echo "$resp" | grep -q '"ok":true'; then
+              echo "telegram alert sent"
+            else
+              echo "::error::failed to send telegram alert: ${resp:0:300}"
+            fi
+          }
+
+          if [ "$CURRENT_OK" = "1" ]; then
+            echo "health check OK. previous run conclusion: ${prev1:-none}"
+            if [ "$prev1" = "failure" ]; then
+              send_telegram $'\xE2\x9C\x85 Сервер снова доступен (zynto.duckdns.org /v1/health отвечает). Мониторинг: GitHub Actions (внешний, независимый от bandana и VPS-релея).'
+            fi
+          else
+            echo "health check FAILED. previous run conclusion: ${prev1:-none}, before that: ${prev2:-none}"
+            # Alert on the 2nd consecutive failure (this run + prev1 both failed),
+            # and only once (don't re-alert if prev2 was also a failure already).
+            if [ "$prev1" = "failure" ] && [ "$prev2" != "failure" ]; then
+              send_telegram $'\xE2\x9A\xA0\xEF\xB8\x8F Сервер недоступен снаружи (zynto.duckdns.org /v1/health не отвечает уже 2+ проверки подряд, ~10 мин). Мониторинг: GitHub Actions (внешний, независимый от bandana и VPS-релея). Проверь bandana (Tailscale) и питание/сеть на месте.'
+            fi
+          fi
